@@ -537,7 +537,7 @@ All ${inDeckTotal} copies in it go back to your binder. The list and history sta
               <p className="muted small" style={{ marginTop: 0 }}>Every saved change in this deck family, newest first. Each color is one deck; curves show where a variant was made, dashed curves a change it took from its parent. Click a deck name to open it.</p>
               <VersionGraph family={family} changes={familyChanges} currentId={deck.id} />
             </div>
-          ) : null}
+          ) : <p className="muted small" style={{ margin: 0 }}>The version graph appears once this deck has a second change or a variant.</p>}
           <h2>Make a variant</h2>
           {variantFrom !== undefined && (
             <p className="row small">Made from change {variantFrom} (an older version), not the latest.

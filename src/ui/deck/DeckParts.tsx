@@ -3,8 +3,9 @@ import * as actions from '../../app/actions';
 import { repo } from '../../app/repo';
 import { diffLists } from '../../domain/decklist';
 import type { DeckLine } from '../../domain/types';
+import { LabelChip } from '../components';
 
-/** Small deck-page pieces: compare with another deck, "when to play", log a result, make a variant. */
+/** Small deck-page pieces: compare with another deck, labels, log a result, make a variant. */
 
 /** Card differences between this deck and any other deck of the same game. */
 export function CompareWith({ deck, lines, decks }: { deck: { name: string }; lines: DeckLine[]; decks: { id: string; name: string }[] }) {
@@ -46,26 +47,32 @@ export function CompareWith({ deck, lines, decks }: { deck: { name: string }; li
   );
 }
 
-/** "When to play this deck": the reason a variant exists, edited in place. */
-export function Purpose({ value, onSave }: { value?: string; onSave: (v: string) => void }) {
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(value ?? '');
-  if (!editing) {
-    return (
-      <p className="purpose small">
-        {value ? <><span className="muted">When to play:</span> {value} </> : null}
-        <button type="button" className="link-button accent-link" onClick={() => { setText(value ?? ''); setEditing(true); }}>
-          {value ? 'Edit' : '+ Add when to play this deck'}
-        </button>
-      </p>
-    );
-  }
+/** Add a label, ignoring case duplicates; labels are short, like GitHub labels. */
+const addLabel = (labels: string[], raw: string) => {
+  const t = raw.trim().slice(0, 30);
+  return !t || labels.some((l) => l.toLowerCase() === t.toLowerCase()) ? labels : [...labels, t];
+};
+
+/** Deck labels ("vs aggro", "budget"): chips with ×, plus an input that suggests labels used on other decks. */
+export function Labels({ value = [], known, onSave }: { value?: string[]; known: string[]; onSave: (labels: string[]) => void }) {
+  const [adding, setAdding] = useState(false);
+  const [text, setText] = useState('');
+  const suggestions = known.filter((k) => !value.some((v) => v.toLowerCase() === k.toLowerCase()));
   return (
-    <form className="row purpose" onSubmit={(e) => { e.preventDefault(); onSave(text.trim()); setEditing(false); }}>
-      <input value={text} onChange={(e) => setText(e.target.value)} placeholder="For example: against aggro-heavy locals, or on a budget" aria-label="When to play this deck" style={{ flex: 1, minWidth: '14rem' }} autoFocus />
-      <button type="submit" className="small primary">Save</button>
-      <button type="button" className="small" onClick={() => setEditing(false)}>Cancel</button>
-    </form>
+    <div className="row labels">
+      {value.map((l) => <LabelChip key={l} name={l} onRemove={() => onSave(value.filter((x) => x !== l))} />)}
+      {adding ? (
+        <form className="row" onSubmit={(e) => { e.preventDefault(); const next = addLabel(value, text); if (next !== value) onSave(next); setText(''); setAdding(false); }}>
+          <input className="label-input" list="known-labels" value={text} onChange={(e) => setText(e.target.value)} placeholder="vs aggro, budget, locals…" aria-label="New label" autoFocus
+            onKeyDown={(e) => e.key === 'Escape' && setAdding(false)} />
+          <datalist id="known-labels">{suggestions.map((k) => <option key={k} value={k} />)}</datalist>
+          <button type="submit" className="small primary">Add</button>
+          <button type="button" className="small" onClick={() => setAdding(false)}>Cancel</button>
+        </form>
+      ) : (
+        <button type="button" className="link-button accent-link small" onClick={() => setAdding(true)}>{value.length ? '+ Label' : '+ Add a label (when to play it)'}</button>
+      )}
+    </div>
   );
 }
 
@@ -83,13 +90,14 @@ export function LogResult({ onSave, onCancel }: { onSave: (result: string, note:
   );
 }
 
-export function MakeVariant({ onMake, defaultName }: { onMake: (name: string, purpose: string) => void; defaultName: string }) {
+export function MakeVariant({ onMake, defaultName, known }: { onMake: (name: string, labels: string[]) => void; defaultName: string; known: string[] }) {
   const [name, setName] = useState(defaultName);
-  const [purpose, setPurpose] = useState('');
+  const [labels, setLabels] = useState('');
   return (
-    <form className="row" onSubmit={(e) => { e.preventDefault(); onMake(name, purpose); }}>
+    <form className="row" onSubmit={(e) => { e.preventDefault(); onMake(name, labels.split(',').reduce(addLabel, [] as string[])); }}>
       <label className="field" style={{ flex: 1, minWidth: '12rem' }}>Variant name<input value={name} onChange={(e) => setName(e.target.value)} /></label>
-      <label className="field" style={{ flex: 2, minWidth: '14rem' }}>When to play it<input value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="For example: against aggro, or on a budget" /></label>
+      <label className="field" style={{ flex: 2, minWidth: '14rem' }}>Labels (comma-separated)<input value={labels} onChange={(e) => setLabels(e.target.value)} list="variant-labels" placeholder="vs aggro, budget" /></label>
+      <datalist id="variant-labels">{known.map((k) => <option key={k} value={k} />)}</datalist>
       <button type="submit" className="primary" style={{ alignSelf: 'flex-end' }}>Make variant</button>
     </form>
   );

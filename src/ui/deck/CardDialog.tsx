@@ -7,7 +7,8 @@ import { formatUsd } from '../../domain/insights';
 import type { SlotStatus } from '../../domain/status';
 import { BINDER, type Card, type DeckLine } from '../../domain/types';
 import type { GameAdapter } from '../../games/types';
-import { SlotChips } from '../components';
+import { LabelChip, SlotChips } from '../components';
+import { cardTags, tagRulesFor } from '../../domain/cardText';
 
 interface Props {
   adapter: GameAdapter;
@@ -17,16 +18,26 @@ interface Props {
   card?: Card;
   status?: SlotStatus;
   deckName: (id: string) => string;
+  isLocked: (id: string) => boolean;
   onMove: (from: string, qty: number) => void;
   /** Player got new copies (bought, traded): add them straight into this deck. */
   onAcquired: (qty: number) => void;
+  /** Move copies to the binder; with updateList the deck also needs that many fewer. */
+  onTakeOut: (qty: number, updateList: boolean) => void;
+  /** Make this line need `qty` copies (the copies in the deck now). */
+  onTrim: (qty: number) => void;
   onClose: () => void;
 }
 
 /** Card details and quick actions, in a native modal dialog (focus trap and Esc for free). */
-export function CardDialog({ adapter, deckId, line, card, status, deckName, onMove, onAcquired, onClose }: Props) {
+export function CardDialog({ adapter, deckId, line, card, status, deckName, isLocked, onMove, onAcquired, onTakeOut, onTrim, onClose }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const [got, setGot] = useState(status?.missing || 1);
+  const inDeck = status?.inDeck ?? 0;
+  const [out, setOut] = useState(1);
+  const n = Math.min(Math.max(1, out), inDeck);
+  // Copies left for this line once other sections (sideboard) take theirs.
+  const fits = status ? Math.max(0, inDeck - (status.needed - line.qty)) : line.qty;
   // Other decks whose list includes this card (whether or not they hold copies of it).
   const alsoIn = useLoad(async () => {
     const decks = (await repo.listDecks()).filter((d) => d.game === adapter.id && d.id !== deckId);
@@ -80,19 +91,41 @@ export function CardDialog({ adapter, deckId, line, card, status, deckName, onMo
               ))}
             </div>
           )}
+          {card && cardTags(card, tagRulesFor(adapter)).length > 0 && (
+            <div className="row labels">{cardTags(card, tagRulesFor(adapter)).map((t) => <LabelChip key={t} name={t} />)}</div>
+          )}
+          {card?.text && <p className="card-text small">{card.text}</p>}
           {adapter.id === 'pokemon' && <p className="muted small" style={{ margin: 0 }}>Legality shown is for this printing; a legal reprint with the same text also counts.</p>}
 
           <div>
-            <h3>This deck needs {line.qty}{status && status.needed !== line.qty ? ` (${status.needed} across sections)` : ''}</h3>
-            <div className="row"><SlotChips status={status} deckName={deckName} /></div>
+            <h3>This deck needs {line.qty}{status && status.needed !== line.qty ? ` (${status.needed} across sections)` : ''}
+              {status && inDeck < status.needed && <span className="short"> ({inDeck}/{status.needed} in deck)</span>}</h3>
+            <div className="row"><SlotChips status={status} deckName={deckName} isLocked={isLocked} /></div>
           </div>
+
+          {inDeck > 0 && (
+            <div className="stack takeout" style={{ gap: '0.4rem' }}>
+              <span className="muted small">Take copies out to the binder</span>
+              <div className="row">
+                <input className="qty" type="number" min={1} max={inDeck} value={n} onChange={(e) => setOut(Number(e.target.value))} aria-label="Copies to take out" />
+                <button type="button" className="small" onClick={() => onTakeOut(n, false)} title="The deck still needs them; the card shows short">Take out, keep in list</button>
+                <button type="button" className="small danger" onClick={() => onTakeOut(n, true)} disabled={n > line.qty} title="The deck needs fewer from now on">Remove from deck</button>
+              </div>
+            </div>
+          )}
+          {fits < line.qty && (
+            <div className="row">
+              <span className="muted small">Not putting them back?</span>
+              <button type="button" className="small" onClick={() => onTrim(fits)}>{fits > 0 ? `Change list to need ${fits}` : 'Remove from list'}</button>
+            </div>
+          )}
 
           {status && (status.inBinder > 0 || status.inOtherDecks.length > 0) && (
             <div className="stack" style={{ gap: '0.4rem' }}>
               <span className="muted small">Move owned copies into this deck</span>
               <div className="row">
                 {status.inBinder > 0 && <button type="button" className="small" onClick={() => onMove(BINDER, status.inBinder)}>From binder ({status.inBinder})</button>}
-                {status.inOtherDecks.map((o) => (
+                {status.inOtherDecks.filter((o) => !isLocked(o.deckId)).map((o) => (
                   <button key={o.deckId} type="button" className="small" onClick={() => onMove(o.deckId, o.qty)}>From {deckName(o.deckId)} ({o.qty})</button>
                 ))}
               </div>

@@ -1,4 +1,5 @@
 import type { ListFormat, ParsedLine } from '../domain/listParse';
+import type { TagRule } from '../domain/cardText';
 import type { DeckRules } from '../domain/rules';
 import type { Card, DeckLine, GameId } from '../domain/types';
 
@@ -38,6 +39,8 @@ export interface GameAdapter {
   /** Match parsed lines to cards. Unmatched lines come back without a card. */
   resolve(lines: ParsedLine[]): Promise<ResolvedLine[]>;
   search(query: string): Promise<Card[]>;
+  /** Optional role tags for this game, added to the common ones (draw, removal, aoe…). */
+  tagRules?: TagRule[];
   /**
    * Optional deeper legality check for cards whose stored data says "not legal" or is unknown.
    * Without it, `Card.legal` is taken as is.

@@ -8,4 +8,5 @@ export const stamp = (cards: Card[]): Card[] => {
 
 /** Card data older than this is fetched again when its deck is opened. */
 export const STALE_MS = 7 * 864e5;
-export const isStale = (c: Card | undefined) => !c?.fetchedAt || Date.now() - Date.parse(c.fetchedAt) > STALE_MS;
+// Cards cached before rules text was stored have no `text` yet: fetch them again.
+export const isStale = (c: Card | undefined) => !c?.fetchedAt || c.text === undefined || Date.now() - Date.parse(c.fetchedAt) > STALE_MS;

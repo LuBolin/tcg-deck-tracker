@@ -22,7 +22,8 @@ interface ScryCard {
   legalities?: Record<string, string>;
   cmc?: number;
   color_identity?: string[];
-  card_faces?: { name: string; type_line?: string; oracle_id?: string; image_uris?: { small?: string } }[];
+  oracle_text?: string;
+  card_faces?: { name: string; type_line?: string; oracle_id?: string; oracle_text?: string; image_uris?: { small?: string } }[];
 }
 
 type Identifier = { set: string; collector_number: string } | { name: string };
@@ -64,6 +65,7 @@ export function toCard(c: ScryCard): Card | undefined {
       : undefined,
     cost: c.cmc,
     identity: c.color_identity,
+    text: c.oracle_text ?? (c.card_faces ?? []).map((f) => f.oracle_text ?? '').filter(Boolean).join('\n//\n'),
   };
 }
 
@@ -105,6 +107,7 @@ export function createMtgAdapter(fetchFn: typeof fetchJson = fetchJson): GameAda
 
   return {
     id: 'mtg',
+    tagRules: [{ tag: 'burn', phrases: ['damage any target', 'damage each opponent', 'damage target player', 'damage target opponent'] }],
     name: 'Magic: The Gathering',
     source: { name: 'Scryfall', url: 'https://scryfall.com', prices: 'Scryfall (TCGplayer)' },
     sections: [

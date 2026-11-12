@@ -44,10 +44,10 @@ assert.deepEqual((await as(null, 'anon', 'select name from decks')).map((r) => r
 const P = '10000000-0000-0000-0000-000000000001', V = '10000000-0000-0000-0000-000000000002', C1 = '20000000-0000-0000-0000-000000000001';
 const backup = (extra = {}) => JSON.stringify({ version: 1,
   decks: [{ id: P, game: 'demo', name: 'Parent', createdAt: '2026-01-01T00:00:00Z', updatedAt: '2026-01-01T00:00:00Z' },
-          { id: V, game: 'demo', name: 'Variant', parentDeckId: P, parentChangeId: C1, createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z' }],
+          { id: V, game: 'demo', name: 'Variant', labels: ['budget'], locked: true, parentDeckId: P, parentChangeId: C1, createdAt: '2026-01-02T00:00:00Z', updatedAt: '2026-01-02T00:00:00Z' }],
   changes: [{ id: C1, deckId: P, seq: 1, createdAt: '2026-01-01T00:00:00Z', lines: [{ cardId: 'x', name: 'X', qty: 2, section: 'main' }], tags: ['new'], note: 'first', result: '' }],
   copies: [{ game: 'demo', cardId: 'x', location: P, qty: 2 }, { game: 'demo', cardId: 'x', location: 'binder', qty: 1 }],
-  cards: [{ game: 'demo', id: 'x', name: 'X', legal: ['standard'], price: 1.5 }], ...extra }).replaceAll("'", "''");
+  cards: [{ game: 'demo', id: 'x', name: 'X', legal: ['standard'], price: 1.5, text: 'Draw a card.' }], ...extra }).replaceAll("'", "''");
 assert.doesNotMatch(String(await as(B, 'authenticated', `select import_all('${backup()}')`)), /ERROR/);
 assert.deepEqual(await as(B, 'authenticated', `select name, parent_deck_id, parent_change_id from decks order by name`), [
   { name: 'A public', parent_deck_id: null, parent_change_id: null },
@@ -57,6 +57,8 @@ assert.deepEqual(await as(B, 'authenticated', `select name, parent_deck_id, pare
 assert.deepEqual((await as(B, 'authenticated', `select qty from copies order by qty`)).map((r) => r.qty), [1, 2]);
 assert.deepEqual((await as(A, 'authenticated', `select name from decks where owner_id = '${A}' order by name`)).map((r) => r.name), ['A private', 'A public'], 'A is untouched');
 // A failing import (change for a missing deck) leaves everything as it was.
+assert.deepEqual(await as(B, 'authenticated', `select text from cards where id = 'x'`), [{ text: 'Draw a card.' }], 'card text is restored');
+assert.deepEqual(await as(B, 'authenticated', `select labels, locked from decks where id = '${V}'`), [{ labels: ['budget'], locked: true }], 'labels and locked are restored');
 const bad = backup({ changes: [{ id: '20000000-0000-0000-0000-000000000009', deckId: '10000000-0000-0000-0000-000000000099', seq: 1, lines: [], tags: [] }] });
 assert.match(String(await as(B, 'authenticated', `select import_all('${bad}')`)), /ERROR/);
 assert.equal((await as(B, 'authenticated', `select count(*)::int n from decks where owner_id = '${B}'`))[0].n, 2, 'failed import rolls back');

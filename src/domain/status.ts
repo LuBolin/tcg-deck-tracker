@@ -28,8 +28,11 @@ export interface DeckSummary {
   extra: { cardId: string; qty: number }[];
 }
 
-/** Slot status per card for one deck. `copies` must be the rows of that deck's game. */
-export function slotStatuses(deckId: string, lines: DeckLine[], copies: CopyRow[]): Map<string, SlotStatus> {
+/**
+ * Slot status per card for one deck. `copies` must be the rows of that deck's game.
+ * Copies in `locked` decks are counted last, so decks in rotation are named first.
+ */
+export function slotStatuses(deckId: string, lines: DeckLine[], copies: CopyRow[], locked: Set<string> = new Set()): Map<string, SlotStatus> {
   const byCard = new Map<string, CopyRow[]>();
   for (const c of copies) {
     if (c.qty <= 0) continue;
@@ -50,8 +53,8 @@ export function slotStatuses(deckId: string, lines: DeckLine[], copies: CopyRow[
     const inDeck = take(rows.find((r) => r.location === deckId)?.qty ?? 0);
     const inBinder = take(rows.find((r) => r.location === BINDER)?.qty ?? 0);
     const inOtherDecks: SlotStatus['inOtherDecks'] = [];
-    for (const r of rows) {
-      if (r.location === deckId || r.location === BINDER) continue;
+    const others = rows.filter((r) => r.location !== deckId && r.location !== BINDER);
+    for (const r of [...others.filter((o) => !locked.has(o.location)), ...others.filter((o) => locked.has(o.location))]) {
       const qty = take(r.qty);
       if (qty > 0) inOtherDecks.push({ deckId: r.location, qty });
     }

@@ -118,3 +118,42 @@ describe('deck use cases on the local repository', () => {
   });
 });
 
+
+describe('taking cards out, archiving and locked decks', async () => {
+  const { takeOut, setLineQty, archiveDeck } = await import('./actions');
+  const { slotStatuses } = await import('../domain/status');
+
+  it('takes out keeping the list (3/4), then trims the list; or removes in one step', async () => {
+    const repo = new LocalRepository('test-takeout');
+    const deck = await createDeck(repo, { game: 'demo', name: 'D', lines: [line('crustle', 4), line('b', 2)], owned: new Map([['crustle', 4], ['b', 2]]) });
+    const crustle = (await latestLines(repo, deck.id))[0];
+
+    await takeOut(repo, deck, crustle, 1, false);
+    let st = slotStatuses(deck.id, await latestLines(repo, deck.id), await repo.listCopies('demo')).get('crustle')!;
+    expect([st.needed, st.inDeck, st.inBinder]).toEqual([4, 3, 1]);
+
+    await setLineQty(repo, deck, crustle, 3);
+    st = slotStatuses(deck.id, await latestLines(repo, deck.id), await repo.listCopies('demo')).get('crustle')!;
+    expect([st.needed, st.inDeck]).toEqual([3, 3]);
+
+    const b = (await latestLines(repo, deck.id)).find((l) => l.cardId === 'b')!;
+    await takeOut(repo, deck, b, 2, true);
+    expect((await latestLines(repo, deck.id)).map((l) => l.cardId)).toEqual(['crustle']);
+    expect((await repo.listChanges(deck.id)).at(-1)!.tags).toEqual(['removed']);
+    expect((await repo.listCopies('demo')).find((c) => c.cardId === 'b')).toMatchObject({ location: BINDER, qty: 2 });
+  });
+
+  it('archives a deck into the binder, keeping its list', async () => {
+    const repo = new LocalRepository('test-archive');
+    const deck = await createDeck(repo, { game: 'demo', name: 'D', lines: [line('a', 2)], owned: new Map([['a', 2]]) });
+    expect(movedCount(await archiveDeck(repo, deck))).toBe(2);
+    expect((await repo.listCopies('demo')).map((c) => [c.location, c.qty])).toEqual([[BINDER, 2]]);
+    expect(await latestLines(repo, deck.id)).toHaveLength(1);
+  });
+
+  it('names decks in rotation before locked decks', () => {
+    const copies = [{ game: 'demo', cardId: 'a', location: 'locked', qty: 2 }, { game: 'demo', cardId: 'a', location: 'open', qty: 2 }];
+    const st = slotStatuses('me', [line('a', 3)], copies, new Set(['locked'])).get('a')!;
+    expect(st.inOtherDecks).toEqual([{ deckId: 'open', qty: 2 }, { deckId: 'locked', qty: 1 }]);
+  });
+});

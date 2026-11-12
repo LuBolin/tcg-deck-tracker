@@ -15,6 +15,7 @@ interface OpCard {
   card_name: string;
   card_set_id: string;
   card_type: string;
+  card_text?: string | null;
   card_color?: string;
   card_cost?: string | null;
   market_price?: number | null;
@@ -45,6 +46,7 @@ export function toCard(c: OpCard): Card {
     price: c.market_price ?? undefined,
     cost: Number.isFinite(Number(c.card_cost)) && c.card_cost !== null && c.card_cost !== '' ? Number(c.card_cost) : undefined,
     identity: c.card_color ? c.card_color.split(/\s+/) : undefined,
+    text: (c.card_text ?? '').replace(/\s*This card has been officially errata'd\.?/i, '').trim(),
   };
 }
 
@@ -84,6 +86,7 @@ export function createOnePieceAdapter(fetchFn: typeof fetchJson = fetchJson): Ga
 
   return {
     id: 'onepiece',
+    tagRules: [{ tag: 'blocker', phrases: ['blocker'] }, { tag: 'rush', phrases: ['rush'] }],
     name: 'One Piece',
     source: { name: 'OPTCG API', url: 'https://optcgapi.com', prices: 'TCGplayer market price via OPTCG API' },
     sections: [

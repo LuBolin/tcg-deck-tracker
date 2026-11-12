@@ -6,10 +6,11 @@ import { plural } from '../text';
  * Where to fetch this deck's cards from, grouped by place, so a player rebuilding a deck
  * knows which binder page or deck box to open. One button moves a whole group.
  */
-export function GatherPanel({ lines, statuses, deckName, onGather, onClose }: {
+export function GatherPanel({ lines, statuses, deckName, isLocked, onGather, onClose }: {
   lines: DeckLine[];
   statuses: Map<string, SlotStatus>;
   deckName: (id: string) => string;
+  isLocked: (id: string) => boolean;
   onGather: (from: string, label: string) => void;
   onClose: () => void;
 }) {
@@ -17,7 +18,7 @@ export function GatherPanel({ lines, statuses, deckName, onGather, onClose }: {
   const groups = new Map<string, { cardId: string; qty: number }[]>();
   for (const s of statuses.values()) {
     if (s.inBinder > 0) groups.set(BINDER, [...(groups.get(BINDER) ?? []), { cardId: s.cardId, qty: s.inBinder }]);
-    for (const o of s.inOtherDecks) groups.set(o.deckId, [...(groups.get(o.deckId) ?? []), { cardId: s.cardId, qty: o.qty }]);
+    for (const o of s.inOtherDecks.filter((x) => !isLocked(x.deckId))) groups.set(o.deckId, [...(groups.get(o.deckId) ?? []), { cardId: s.cardId, qty: o.qty }]);
   }
   const missing = [...statuses.values()].filter((s) => s.missing > 0);
 

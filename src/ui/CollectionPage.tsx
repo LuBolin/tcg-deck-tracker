@@ -12,7 +12,8 @@ import { downloadText } from './download';
 import { BINDER } from '../domain/types';
 import { games } from '../games';
 import type { ResolvedLine } from '../games/types';
-import { Empty, ErrorBox, Loading } from './components';
+import { Empty, ErrorBox, LabelChip, Loading } from './components';
+import { cardTags, searchCards, tagRulesFor } from '../domain/cardText';
 import { useGameChoice } from './useGameChoice';
 import { plural } from './text';
 import { ListReader } from './ListReader';
@@ -40,6 +41,10 @@ export function CollectionPage() {
   const adapter = games().find((g) => g.id === gameId)!;
   const { data, error, reload } = useLoad(() => load(gameId), [gameId]);
   const [filter, setFilter] = useState('');
+  const [role, setRole] = useState<string>();
+  const rules = useMemo(() => tagRulesFor(adapter), [adapter]);
+  // Role tags per card, computed once per load.
+  const tagsById = useMemo(() => new Map((data?.cards ?? []).map((c) => [c.id, cardTags(c, rules)])), [data, rules]);
   const [adding, setAdding] = useState<ResolvedLine[]>([]);
   const [unresolved, setUnresolved] = useState(0);
   const [readerKey, setReaderKey] = useState(0);
@@ -49,6 +54,8 @@ export function CollectionPage() {
   const [sort, setSort] = useState<'name' | 'value' | 'count'>('name');
 
   const rows = useMemo(() => {
+    // Name, role tag or rules text ("draw a card" finds "draws 2 cards").
+    const matched = filter.trim() ? new Set(searchCards(data?.cards ?? [], filter, (c) => tagsById.get(c.id) ?? []).map((c) => c.id)) : undefined;
     if (!data) return [];
     const byCard = new Map<string, { location: string; qty: number }[]>();
     for (const c of data.copies) byCard.set(c.cardId, [...(byCard.get(c.cardId) ?? []), { location: c.location, qty: c.qty }]);
@@ -63,7 +70,8 @@ export function CollectionPage() {
         total: locs.reduce((n, l) => n + l.qty, 0),
         needs: data.needs.get(cardId) ?? [],
       }))
-      .filter((r) => r.name.toLowerCase().includes(filter.trim().toLowerCase()))
+      .filter((r) => !matched || matched.has(r.cardId))
+      .filter((r) => !role || (tagsById.get(r.cardId) ?? []).includes(role))
       .filter((r) =>
         show === 'missing' ? r.needs.some((n) => n.missing > 0)
         : r.total === 0 ? false
@@ -72,7 +80,8 @@ export function CollectionPage() {
         sort === 'value' ? (b.card?.price ?? 0) * b.total - (a.card?.price ?? 0) * a.total || a.name.localeCompare(b.name)
         : sort === 'count' ? b.total - a.total || a.name.localeCompare(b.name)
         : a.name.localeCompare(b.name));
-  }, [data, filter, show, sort]);
+  }, [data, filter, show, sort, role, tagsById]);
+  const roles = [...new Set(rows.flatMap((r) => tagsById.get(r.cardId) ?? []).concat(role ? [role] : []))].sort();
 
   const run = async (fn: () => Promise<unknown>) => {
     setActionError(undefined);
@@ -143,7 +152,7 @@ export function CollectionPage() {
       ) : (
         <div className="panel">
           <div className="spread" style={{ marginBottom: '0.5rem' }}>
-            <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Find a card" aria-label="Find a card" />
+            <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder="Find a card: name, role or text" aria-label="Find a card" title='Searches names, role tags and rules text, for example "draw a card"' />
             <button type="button" className="small" onClick={exportCsv}>Export CSV</button>
             <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)} aria-label="Sort cards">
               <option value="name">By name</option>
@@ -159,6 +168,12 @@ export function CollectionPage() {
               {plural(total, 'copy', 'copies')}, {plural(rows.length, 'card')}{value > 0 && <> · about <strong className="text">{formatUsd(value)}</strong></>}
             </span>
           </div>
+          {roles.length > 0 && (
+            <div className="row labels" aria-label="Filter by role" style={{ marginBottom: '0.5rem' }}>
+              <span className="muted small">Roles:</span>
+              {roles.map((t) => <LabelChip key={t} name={t} active={role === t} onClick={() => setRole(role === t ? undefined : t)} />)}
+            </div>
+          )}
           <table className="list">
             <thead><tr><th>Card</th><th className="num">Owned</th><th>Where</th><th>Needed by</th><th className="num">Value</th><th className="num">Binder</th></tr></thead>
             <tbody>
@@ -174,6 +189,7 @@ export function CollectionPage() {
                         <button type="button" className="link-button" onClick={() => setOpenCard(r.cardId)}>{r.name}</button>
                         {r.card?.imageUrl && <img className="preview" src={r.card.imageUrl} alt="" loading="lazy" />}
                       </span>
+                      {(tagsById.get(r.cardId)?.length ?? 0) > 0 && <span className="row labels">{tagsById.get(r.cardId)!.map((t) => <LabelChip key={t} name={t} />)}</span>}
                     </td>
                     <td className="num">{r.total}</td>
                     <td>

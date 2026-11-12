@@ -1,4 +1,4 @@
-import { moveDeltas } from '../domain/collection';
+import { emptyDeckDeltas, moveDeltas } from '../domain/collection';
 import { applyDiff, normalizeLines } from '../domain/decklist';
 import { slotStatuses, summarize } from '../domain/status';
 import { BINDER, type CopyDelta, type Deck, type DeckLine, type Location } from '../domain/types';
@@ -90,7 +90,7 @@ async function assertOldestPending(repo: Repository, variant: Deck, p: PendingPa
 }
 
 /** Copy a deck into a variant that remembers where it came from. Copies stay where they are. */
-export async function makeVariant(repo: Repository, parent: Deck, name: string, purpose?: string): Promise<Deck> {
+export async function makeVariant(repo: Repository, parent: Deck, name: string, labels: string[] = []): Promise<Deck> {
   const changes = await repo.listChanges(parent.id);
   const base = changes.at(-1);
   const t = now();
@@ -99,7 +99,7 @@ export async function makeVariant(repo: Repository, parent: Deck, name: string, 
     game: parent.game,
     name: name.trim() || `${parent.name} variant`,
     format: parent.format,
-    purpose: purpose?.trim() || undefined,
+    labels: labels.length ? labels : undefined,
     parentDeckId: parent.id,
     parentChangeId: base?.id,
     createdAt: t,
@@ -134,6 +134,36 @@ export async function deleteDeck(repo: Repository, deck: Deck): Promise<void> {
 
 export function moveCopies(repo: Repository, game: string, cardId: string, from: Location, to: Location, qty: number) {
   return repo.adjustCopies(game, moveDeltas(cardId, from, to, qty));
+}
+
+/**
+ * Move copies of a card from the deck to the binder. With `updateList`, the deck's list also needs
+ * that many fewer (one change); without it, the list still needs them and the card shows short (3/4).
+ */
+export async function takeOut(repo: Repository, deck: Deck, line: DeckLine, qty: number, updateList: boolean): Promise<CopyDelta[]> {
+  const deltas = moveDeltas(line.cardId, deck.id, BINDER, qty);
+  if (updateList) {
+    const changes = await repo.listChanges(deck.id);
+    const lines = (changes.at(-1)?.lines ?? []).map((l) => (l.cardId === line.cardId && l.section === line.section ? { ...l, qty: l.qty - qty } : l));
+    // List first: if it fails (deck changed elsewhere), no copy has moved.
+    await saveChange(repo, deck, lines.filter((l) => l.qty > 0), { tags: ['removed'], note: `Took out ${qty} ${line.name}` }, { baseSeq: changes.at(-1)?.seq ?? 0 });
+  }
+  if (deltas.length) await repo.adjustCopies(deck.game, deltas);
+  return deltas;
+}
+
+/** Change how many copies of a line the list needs, for example down to the copies still in the deck. */
+export async function setLineQty(repo: Repository, deck: Deck, line: DeckLine, qty: number): Promise<void> {
+  const changes = await repo.listChanges(deck.id);
+  const lines = (changes.at(-1)?.lines ?? []).map((l) => (l.cardId === line.cardId && l.section === line.section ? { ...l, qty } : l));
+  await saveChange(repo, deck, lines.filter((l) => l.qty > 0), { tags: ['removed'], note: qty ? `Needs ${qty} ${line.name} now` : `Removed ${line.name}` }, { baseSeq: changes.at(-1)?.seq ?? 0 });
+}
+
+/** Send every copy in the deck back to the binder. The list and history stay, so the deck shows under Empty decks. */
+export async function archiveDeck(repo: Repository, deck: Deck): Promise<CopyDelta[]> {
+  const deltas = emptyDeckDeltas(await repo.listCopies(deck.game), deck.id);
+  if (deltas.length) await repo.adjustCopies(deck.game, deltas);
+  return deltas;
 }
 
 /** Add copies the player owns to a location, or remove them (negative qty). */
@@ -205,6 +235,6 @@ export async function importShared(repo: Repository, shared: SharedDeck): Promis
 export async function duplicateDeck(repo: Repository, deck: Deck, name: string): Promise<Deck> {
   const lines = await latestLines(repo, deck.id);
   const copy = await createDeck(repo, { game: deck.game, name, format: deck.format, lines });
-  await updateDeck(repo, copy.id, { purpose: deck.purpose });
+  await updateDeck(repo, copy.id, { purpose: deck.purpose, labels: deck.labels });
   return copy;
 }

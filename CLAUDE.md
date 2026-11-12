@@ -49,6 +49,8 @@ Design doc: "TCG Deck Tracker — Design Document" (Claude Docs). Core values: p
 - List edits remember the change they started from (`baseSeq`); saving after the deck changed is refused, so nothing is silently undone.
 - Deck field updates go through `updateDeck` (re-reads the stored deck) so a stale page cannot undo a rename from another tab.
 - Pokémon name-only lines: fetch every printing, sort newest set first (TCGdex returns them unordered), then pick.
+- Card role tags ("draw", "removal", "gust") are computed from `Card.text` and type by `src/domain/cardText.ts` (common rules + `adapter.tagRules`), never stored, so better rules apply to cached cards. Rules match short phrases loosely (stemming, accents, typos, a word window); `not` phrases rule out look-alikes. Search uses the same matcher over name, tags and text.
+- Deck labels (`Deck.labels`) are the player's own words for when to play a deck; `Deck.locked` puts a deck away (its copies are not gathered and collapse into one chip). "Empty decks" is computed: decks holding no copies.
 
 ## Commands
 

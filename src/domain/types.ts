@@ -34,6 +34,8 @@ export interface Card {
   identity?: string[];
   /** A deck-wide limit group the card belongs to, for example "ACE SPEC" (Pokémon: 1 per deck). */
   limitGroup?: string;
+  /** Rules text (abilities, attacks, effects), for role tags and text search. '' = no text. */
+  text?: string;
   /** When the app last fetched this card's data (ISO time); prices and legality go stale. */
   fetchedAt?: string;
 }
@@ -58,6 +60,10 @@ export interface Deck {
   format?: string;
   /** When to play this deck, for example "Use against aggro-heavy locals". */
   purpose?: string;
+  /** Labels for when to play it or what it is, for example "vs aggro" or "budget" (like GitHub labels). */
+  labels?: string[];
+  /** Locked decks are put away: their copies are not offered for gathering and collapse into one chip elsewhere. */
+  locked?: boolean;
   /** The deck this variant was made from. */
   parentDeckId?: string;
   /** The parent's change this variant is based on (moves forward when parent changes are applied or dismissed). */

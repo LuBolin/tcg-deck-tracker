@@ -7,12 +7,12 @@ import { useLoad } from '../app/useLoad';
 import { countCards } from '../domain/decklist';
 import { coverArt, deckValue, formatRecord, formatUsd, totalRecord, type MatchRecord } from '../domain/insights';
 import { slotStatuses, summarize, type DeckSummary } from '../domain/status';
-import type { DeckLine } from '../domain/types';
+import type { Deck, DeckLine } from '../domain/types';
 import { deckTree, type DeckNode } from '../domain/variants';
 import { games } from '../games';
 import { validateDeck } from '../domain/rules';
 import type { GameAdapter } from '../games/types';
-import { Empty, ErrorBox, GameBadge, Loading } from './components';
+import { Empty, ErrorBox, GameBadge, LabelChip, Loading } from './components';
 import { plural } from './text';
 import { useToast } from './toast';
 import { shouldNudgeBackup, snoozeBackupNudge } from './backup';
@@ -20,7 +20,7 @@ import { useTitle } from './useTitle';
 
 const getGameOrNull = (id: string) => games().find((g) => g.id === id);
 
-interface DeckInfo { summary: DeckSummary; mainCount: number; value: number; cover?: string; lastNote?: string; record: MatchRecord; issues: number }
+interface DeckInfo { held: number; summary: DeckSummary; mainCount: number; value: number; cover?: string; lastNote?: string; record: MatchRecord; issues: number }
 
 async function load() {
   const decks = await repo.listDecks();
@@ -43,6 +43,7 @@ async function load() {
     for (const d of gameDecks) {
       const lines = linesByDeck.get(d.id)!;
       info.set(d.id, {
+        held: copies.filter((c) => c.location === d.id).reduce((n, c) => n + c.qty, 0),
         summary: summarize(d.id, lines, copies),
         mainCount: countCards(lines, 'main'),
         value: deckValue(lines, cards, slotStatuses(d.id, lines, copies)).total,
@@ -58,6 +59,13 @@ async function load() {
 
 
 type Sort = 'name' | 'recent' | 'missing';
+/** Empty decks hold no copies (archived, or never built); locked decks are put away; the rest are in rotation. */
+type Bucket = 'rotation' | 'locked' | 'empty';
+const BUCKETS: { id: Bucket; label: string; hint: string }[] = [
+  { id: 'rotation', label: 'In rotation', hint: 'Decks you are playing. Other decks name these when they hold a card you need.' },
+  { id: 'locked', label: 'Locked', hint: 'Built decks you keep together. Gather never takes their cards; elsewhere they show as one "in locked decks" chip.' },
+  { id: 'empty', label: 'Empty decks', hint: 'Decks with no cards in them: archived, or never built. The list and history stay; Gather rebuilds one.' },
+];
 const SORT_KEY = 'decks-sort';
 
 export function DecksPage() {
@@ -65,6 +73,8 @@ export function DecksPage() {
   useTitle("Decks");
   const [query, setQuery] = useState('');
   const [nudge, setNudge] = useState(true);
+  const [bucket, setBucket] = useState<Bucket>('rotation');
+  const [label, setLabel] = useState<string>();
   const [sort, setSort] = useState<Sort>(() => {
     try { return (localStorage.getItem(SORT_KEY) as Sort) || 'name'; } catch { return 'name'; }
   });
@@ -77,15 +87,20 @@ export function DecksPage() {
     sort === 'recent' ? b.deck.updatedAt.localeCompare(a.deck.updatedAt)
     : sort === 'missing' ? data.info.get(b.deck.id)!.summary.missing - data.info.get(a.deck.id)!.summary.missing
     : a.deck.name.localeCompare(b.deck.name);
-  /** Sort every level; when searching, keep decks that match or have a matching variant. */
+  const bucketOf = (d: Deck): Bucket => (data.info.get(d.id)!.held === 0 ? 'empty' : d.locked ? 'locked' : 'rotation');
+  const counts = Object.fromEntries(BUCKETS.map((b) => [b.id, data.decks.filter((d) => bucketOf(d) === b.id).length])) as Record<Bucket, number>;
+  const allLabels = [...new Set(data.decks.flatMap((d) => d.labels ?? []))].sort();
+  const matches = (d: Deck) =>
+    bucketOf(d) === bucket && (!q || d.name.toLowerCase().includes(q)) && (!label || (d.labels ?? []).includes(label));
+  /** Sort every level; keep decks that match, and parents of matching variants (shown faded, for context). */
   const arrange = (nodes: DeckNode[]): DeckNode[] =>
     nodes
       .map((n) => ({ ...n, children: arrange(n.children) }))
-      .filter((n) => !q || n.deck.name.toLowerCase().includes(q) || n.children.length > 0)
+      .filter((n) => matches(n.deck) || n.children.length > 0)
       .sort(compare);
   const byGame = games()
     .map((g) => ({ game: g, total: data.decks.filter((d) => d.game === g.id).length, roots: arrange(deckTree(data.decks.filter((d) => d.game === g.id))) }))
-    .filter((x) => x.total > 0);
+    .filter((x) => x.roots.length > 0);
   const chooseSort = (v: Sort) => {
     setSort(v);
     try { localStorage.setItem(SORT_KEY, v); } catch { /* per-viewer convenience only */ }
@@ -95,10 +110,11 @@ export function DecksPage() {
     const i = data.info.get(n.deck.id)!;
     return (
       <li key={n.deck.id}>
-        <Link to={`/decks/${n.deck.id}`} className="deck-row deck-link">
+        <Link to={`/decks/${n.deck.id}`} className={`deck-row deck-link${matches(n.deck) ? '' : ' context'}`}>
           <span className="deck-cover" aria-hidden>{i.cover && <img src={i.cover} alt="" loading="lazy" />}</span>
           <span className="deck-main">
             <span className="deck-name">{n.deck.name}</span>
+            {(n.deck.labels?.length ?? 0) > 0 && <span className="row labels">{n.deck.labels!.map((l) => <LabelChip key={l} name={l} />)}</span>}
             <span className="muted small">
               {[n.deck.format, plural(i.mainCount, 'card'), i.value > 0 ? formatUsd(i.value) : undefined, i.record.events ? `record ${formatRecord(i.record)}` : undefined].filter(Boolean).join(' · ')}
             </span>
@@ -124,7 +140,25 @@ export function DecksPage() {
         <h1>Your decks</h1>
         <Link className="btn primary" to="/import">Import a deck</Link>
       </div>
-      {byGame.length === 0 && <Welcome onCreated={reload} />}
+      {data.decks.length === 0 && <Welcome onCreated={reload} />}
+      {data.decks.length > 0 && (
+        <div className="stack" style={{ gap: '0.5rem', marginBottom: '0.75rem' }}>
+          <div className="segmented" role="group" aria-label="Which decks" style={{ alignSelf: 'flex-start' }}>
+            {BUCKETS.map((b) => (
+              <button key={b.id} type="button" aria-pressed={bucket === b.id} className={bucket === b.id ? 'on' : ''} onClick={() => setBucket(b.id)}>
+                {b.label} <span className="muted">{counts[b.id]}</span>
+              </button>
+            ))}
+          </div>
+          <span className="muted small">{BUCKETS.find((b) => b.id === bucket)!.hint}</span>
+          {allLabels.length > 0 && (
+            <div className="row labels" aria-label="Filter by label">
+              {allLabels.map((l) => <LabelChip key={l} name={l} active={label === l} onClick={() => setLabel(label === l ? undefined : l)} />)}
+            </div>
+          )}
+        </div>
+      )}
+      {data.decks.length > 0 && byGame.length === 0 && <p className="muted">No decks here{label ? ` with the label "${label}"` : ''}{q ? ' match your search' : ''}.</p>}
       {showNudge && (
         <div className="notice spread">
           <span>Your decks are saved only in this browser. Download a backup so clearing site data cannot erase them.</span>
@@ -148,7 +182,7 @@ export function DecksPage() {
         <section key={game.id} className="panel">
           <div className="row" style={{ marginBottom: '0.5rem' }}>
             <GameBadge name={game.name} />
-            <span className="muted small">{plural(total, 'deck')} · indented decks are variants</span>
+            <span className="muted small">{plural(total, 'deck')} in all · indented decks are variants</span>
           </div>
           {roots.length ? <ul className="deck-tree">{roots.map(row)}</ul> : <p className="muted small">No deck names match.</p>}
         </section>

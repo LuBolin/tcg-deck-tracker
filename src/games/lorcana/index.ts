@@ -14,6 +14,7 @@ interface LorcastCard {
   name: string;
   version?: string | null;
   type: string[];
+  text?: string | null;
   cost?: number;
   ink?: string | null;
   inks?: string[] | null;
@@ -46,6 +47,7 @@ export function toCard(c: LorcastCard): Card {
     legal: c.legalities ? Object.entries(c.legalities).filter(([, v]) => v === 'legal').map(([f]) => f) : undefined,
     cost: c.cost,
     identity: c.inks ?? (c.ink ? [c.ink] : undefined),
+    text: c.text ?? '',
   };
 }
 
@@ -60,6 +62,7 @@ export function createLorcanaAdapter(fetchFn: typeof fetchJson = fetchJson): Gam
 
   return {
     id: 'lorcana',
+    tagRules: [{ tag: 'lore', phrases: ['gain lore'] }, { tag: 'song', test: (c) => c.category === 'Song' }],
     name: 'Disney Lorcana',
     source: { name: 'Lorcast', url: 'https://lorcast.com', prices: 'Lorcast (TCGplayer)' },
     sections: [{ id: 'main', label: 'Deck' }],

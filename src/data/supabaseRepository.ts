@@ -4,7 +4,7 @@ import type { Backup, Repository } from './repository';
 
 /** Rows as Postgres stores them (supabase/migrations/0001_init.sql). */
 interface DeckRow {
-  id: string; game: string; name: string; format: string | null; purpose: string | null;
+  id: string; game: string; name: string; format: string | null; purpose: string | null; labels: string[] | null; locked: boolean | null;
   parent_deck_id: string | null; parent_change_id: string | null; created_at: string; updated_at: string;
 }
 interface ChangeRow { id: string; deck_id: string; seq: number; created_at: string; lines: DeckLine[]; tags: string[]; note: string; result: string }
@@ -12,7 +12,7 @@ interface CopyDbRow { game: string; card_id: string; location: string; qty: numb
 interface CardRow {
   game: string; id: string; name: string; category: string | null; subtype: string | null; set_code: string | null;
   number: string | null; image_url: string | null; price: number | string | null; legal: string[] | null; cost: number | string | null;
-  max_copies: number | null; identity: string[] | null; limit_group: string | null; updated_at: string;
+  max_copies: number | null; identity: string[] | null; limit_group: string | null; text: string | null; updated_at: string;
 }
 
 const opt = <T,>(v: T | null): T | undefined => (v === null ? undefined : v);
@@ -20,6 +20,7 @@ const num = (v: number | string | null) => (v === null ? undefined : Number(v));
 
 const toDeck = (r: DeckRow): Deck => ({
   id: r.id, game: r.game, name: r.name, format: opt(r.format), purpose: opt(r.purpose),
+  labels: r.labels?.length ? r.labels : undefined, locked: r.locked || undefined,
   parentDeckId: opt(r.parent_deck_id), parentChangeId: opt(r.parent_change_id), createdAt: r.created_at, updatedAt: r.updated_at,
 });
 const toChange = (r: ChangeRow): Change => ({
@@ -28,12 +29,12 @@ const toChange = (r: ChangeRow): Change => ({
 const toCard = (r: CardRow): Card => ({
   game: r.game, id: r.id, name: r.name, category: opt(r.category), subtype: opt(r.subtype), set: opt(r.set_code),
   number: opt(r.number), imageUrl: opt(r.image_url), price: num(r.price), legal: opt(r.legal), cost: num(r.cost),
-  maxCopies: opt(r.max_copies), identity: opt(r.identity), limitGroup: opt(r.limit_group), fetchedAt: r.updated_at,
+  maxCopies: opt(r.max_copies), identity: opt(r.identity), limitGroup: opt(r.limit_group), text: opt(r.text), fetchedAt: r.updated_at,
 });
 const fromCard = (c: Card) => ({
   game: c.game, id: c.id, name: c.name, category: c.category ?? null, subtype: c.subtype ?? null, set_code: c.set ?? null,
   number: c.number ?? null, image_url: c.imageUrl ?? null, price: c.price ?? null, legal: c.legal ?? null, cost: c.cost ?? null,
-  max_copies: c.maxCopies ?? null, identity: c.identity ?? null, limit_group: c.limitGroup ?? null,
+  max_copies: c.maxCopies ?? null, identity: c.identity ?? null, limit_group: c.limitGroup ?? null, text: c.text ?? null,
   updated_at: c.fetchedAt ?? new Date().toISOString(),
 });
 
@@ -81,7 +82,7 @@ export class SupabaseRepository implements Repository {
   }
   async putDeck(d: Deck) {
     await must(this.db.from('decks').upsert({
-      id: d.id, game: d.game, name: d.name, format: d.format ?? null, purpose: d.purpose ?? null,
+      id: d.id, game: d.game, name: d.name, format: d.format ?? null, purpose: d.purpose ?? null, labels: d.labels ?? [], locked: d.locked ?? false,
       parent_deck_id: d.parentDeckId ?? null, parent_change_id: d.parentChangeId ?? null, created_at: d.createdAt, updated_at: d.updatedAt,
     }));
   }

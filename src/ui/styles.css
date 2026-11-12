@@ -292,3 +292,20 @@ a.deck-link:hover { text-decoration: none; }
 .footer { max-width: 1040px; margin: 0 auto; padding: 0 1rem 2rem; text-align: center; }
 .help-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 0.4rem; }
 kbd { font-family: ui-monospace, Consolas, monospace; font-size: 0.85em; padding: 0.05rem 0.35rem; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; background: var(--surface-2); }
+
+/* Deck labels, GitHub-style: hue from the label name, readable in both themes. */
+.label-chip { display: inline-flex; align-items: center; gap: 0.25rem; padding: 0.1rem 0.55rem; border-radius: 999px; font-size: 0.78rem; font-weight: 600; line-height: 1.5;
+  background: hsl(var(--label-hue) 75% 50% / 0.16); color: hsl(var(--label-hue) 65% 32%); border: 1px solid hsl(var(--label-hue) 65% 45% / 0.35); }
+button.label-chip { cursor: pointer; }
+button.label-chip.on { background: hsl(var(--label-hue) 65% 45%); color: #fff; }
+.label-x { all: unset; cursor: pointer; padding: 0 0.15rem; opacity: 0.7; }
+.label-x:hover, .label-x:focus-visible { opacity: 1; outline: 1px solid currentColor; border-radius: 4px; }
+.label-input { width: 12rem; }
+.labels { gap: 0.3rem; }
+:root[data-theme="dark"] .label-chip { color: hsl(var(--label-hue) 80% 75%); }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .label-chip { color: hsl(var(--label-hue) 80% 75%); } }
+/* "(3/4)": fewer copies in the deck than it needs. */
+.short { color: var(--bad); font-weight: 600; margin-left: 0.3rem; font-size: 0.85em; }
+/* A parent shown only because a variant matches the filter. */
+.deck-link.context { opacity: 0.55; }
+.card-text { white-space: pre-line; margin: 0; padding: 0.5rem 0.65rem; border-radius: 8px; background: var(--surface-2); max-height: 14rem; overflow: auto; }

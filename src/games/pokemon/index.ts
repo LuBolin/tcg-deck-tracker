@@ -18,8 +18,9 @@ interface TcgdexCard {
   category: 'Pokemon' | 'Trainer' | 'Energy';
   image?: string;
   hp?: number;
-  attacks?: { name: string; damage?: string | number; cost?: string[] }[];
-  abilities?: { name: string }[];
+  attacks?: { name: string; damage?: string | number; cost?: string[]; effect?: string }[];
+  abilities?: { name: string; effect?: string }[];
+  effect?: string;
   set: { id: string; name: string };
   legal?: Record<string, boolean>;
   stage?: string;
@@ -149,6 +150,11 @@ export function createPokemonAdapter(fetchFn: typeof fetchJson = fetchJson): Gam
       subtype: subtypeOf(c),
       limitGroup: /ace spec/i.test(c.rarity ?? '') ? 'ACE SPEC' : /^Radiant /.test(c.name) ? 'Radiant' : undefined,
       legal: legalFormats(c),
+      text: [
+        ...(c.abilities ?? []).map((a) => `${a.name}: ${a.effect ?? ''}`),
+        ...(c.attacks ?? []).map((a) => `${a.name}${a.damage ? ` (${a.damage})` : ''}: ${a.effect ?? ''}`),
+        c.effect ?? '',
+      ].filter((t) => t.trim()).join('\n'),
     };
   };
 
@@ -209,6 +215,16 @@ export function createPokemonAdapter(fetchFn: typeof fetchJson = fetchJson): Gam
 
   return {
     id: 'pokemon',
+    tagRules: [
+      { tag: 'supporter', test: (c) => c.subtype === 'Supporter' },
+      { tag: 'item', test: (c) => c.subtype === 'Item' },
+      { tag: 'tool', test: (c) => c.subtype === 'Tool' },
+      { tag: 'stadium', test: (c) => c.subtype === 'Stadium' },
+      { tag: 'gust', phrases: ["switch opponent benched pokemon active", "opponent benched pokemon switch active"] },
+      { tag: 'switch', phrases: ['switch active pokemon benched pokemon'], not: ['opponent benched pokemon'] },
+      { tag: 'energy accel', phrases: ['attach energy from deck', 'attach energy from discard', 'search deck energy attach'] },
+      { tag: 'disruption', phrases: ['opponent shuffle hand', 'opponent discard', 'each player shuffle hand'] },
+    ],
     name: 'Pokémon',
     source: { name: 'TCGdex', url: 'https://tcgdex.dev', prices: 'TCGplayer market price via TCGdex' },
     sections: [{ id: 'main', label: 'Deck' }],

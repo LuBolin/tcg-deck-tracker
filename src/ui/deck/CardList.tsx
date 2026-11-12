@@ -17,6 +17,7 @@ interface Props {
   format?: string;
   view: View;
   deckName: (id: string) => string;
+  isLocked: (id: string) => boolean;
   onMove: (line: DeckLine, from: string, qty: number) => void;
   onOpen: (line: DeckLine) => void;
 }
@@ -51,21 +52,29 @@ export function CardList(p: Props) {
   );
 }
 
-function CardRow({ line: l, open, onToggle, statuses, cards, illegal, format, deckName, onMove, onOpen }: Props & { line: DeckLine; open: boolean; onToggle: () => void }) {
+/** "(3/4)": copies in the deck out of copies the deck needs, when some owned copies are elsewhere. */
+function Short({ st }: { st?: SlotStatus }) {
+  // Not owned at all already reads "N missing"; the count is for copies you own but took out.
+  if (!st || st.inDeck >= st.needed || st.missing === st.needed) return null;
+  return <span className="short" title={`${st.inDeck} of ${st.needed} copies are in this deck`}>({st.inDeck}/{st.needed})</span>;
+}
+
+function CardRow({ line: l, open, onToggle, statuses, cards, illegal, format, deckName, isLocked, onMove, onOpen }: Props & { line: DeckLine; open: boolean; onToggle: () => void }) {
   const st = statuses.get(l.cardId);
   const card = cards.get(l.cardId);
-  const canGet = !!st && (st.inBinder > 0 || st.inOtherDecks.length > 0);
+  const canGet = !!st && (st.inBinder > 0 || st.inOtherDecks.some((o) => !isLocked(o.deckId)));
   return (
     <div className="card-line">
       <span className="qty-n">{l.qty}</span>
       <span className="card-name">
         <button type="button" className="link-button" onClick={() => onOpen(l)}>{l.name}</button>
+        <Short st={st} />
         <span className="print">{[l.set, l.number].filter(Boolean).join(' ')}</span>
         {card?.imageUrl && <img className="preview" src={card.imageUrl} alt="" loading="lazy" />}
       </span>
       <span className="chips">
         {illegal.has(l.cardId) && <span className="chip bad" title={`Not legal in ${format}`}>not {format}-legal</span>}
-        <SlotChips status={st} deckName={deckName} />
+        <SlotChips status={st} deckName={deckName} isLocked={isLocked} />
         {canGet && (
           <button type="button" className="small ghost" aria-expanded={open} onClick={onToggle}>Get copies</button>
         )}
@@ -74,7 +83,7 @@ function CardRow({ line: l, open, onToggle, statuses, cards, illegal, format, de
         <div className="sources">
           <span className="muted small">Move into this deck from:</span>
           {st.inBinder > 0 && <button type="button" className="small" onClick={() => onMove(l, BINDER, st.inBinder)}>Binder ({st.inBinder})</button>}
-          {st.inOtherDecks.map((o) => (
+          {st.inOtherDecks.filter((o) => !isLocked(o.deckId)).map((o) => (
             <button key={o.deckId} type="button" className="small" onClick={() => onMove(l, o.deckId, o.qty)}>{deckName(o.deckId)} ({o.qty})</button>
           ))}
         </div>
@@ -83,7 +92,7 @@ function CardRow({ line: l, open, onToggle, statuses, cards, illegal, format, de
   );
 }
 
-function CardTile({ line: l, statuses, cards, illegal, format, deckName, onOpen }: Props & { line: DeckLine }) {
+function CardTile({ line: l, statuses, cards, illegal, format, deckName, isLocked, onOpen }: Props & { line: DeckLine }) {
   const st = statuses.get(l.cardId);
   const card = cards.get(l.cardId);
   const missing = st?.missing ?? 0;
@@ -95,10 +104,10 @@ function CardTile({ line: l, statuses, cards, illegal, format, deckName, onOpen 
         {missing > 0 && <span className="missing-badge">{missing} missing</span>}
       </button>
       <figcaption>
-        <span className="small">{l.name}</span>
+        <span className="small">{l.name} <Short st={st} /></span>
         <span className="chips">
           {illegal.has(l.cardId) && <span className="chip bad">not {format}-legal</span>}
-          {st && st.inDeck < st.needed && <SlotChips status={{ ...st, inDeck: 0, missing: 0 }} deckName={deckName} />}
+          {st && st.inDeck < st.needed && <SlotChips status={{ ...st, inDeck: 0, missing: 0 }} deckName={deckName} isLocked={isLocked} />}
         </span>
       </figcaption>
     </figure>

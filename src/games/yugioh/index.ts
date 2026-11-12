@@ -15,6 +15,7 @@ interface YgoCard {
   name: string;
   type: string;
   frameType: string;
+  desc?: string;
   card_images?: { image_url_small?: string }[];
   card_prices?: { tcgplayer_price?: string }[];
   card_sets?: { set_code: string }[];
@@ -45,6 +46,7 @@ export function toCard(c: YgoCard): Card {
     imageUrl: c.card_images?.[0]?.image_url_small,
     price: Number(c.card_prices?.[0]?.tcgplayer_price) || undefined,
     maxCopies: ban ? BAN_LIMIT[ban] : undefined,
+    text: c.desc ?? '',
   };
 }
 
@@ -100,6 +102,7 @@ export function createYugiohAdapter(fetchFn: typeof fetchJson = fetchJson): Game
 
   return {
     id: 'yugioh',
+    tagRules: [{ tag: 'hand trap', phrases: ['discard this card negate', 'send this card from your hand to the graveyard'] }, { tag: 'negate', phrases: ['negate'] }],
     name: 'Yu-Gi-Oh!',
     source: { name: 'YGOPRODeck', url: 'https://ygoprodeck.com', prices: 'TCGplayer price via YGOPRODeck' },
     sections: [

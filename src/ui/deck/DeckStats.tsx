@@ -1,3 +1,5 @@
+import { cardTags, tagRulesFor } from '../../domain/cardText';
+import { LabelChip } from '../components';
 import { useState } from 'react';
 import { cardTotals, countCards } from '../../domain/decklist';
 import { chanceInHand, costCurve, deckValue, formatUsd } from '../../domain/insights';
@@ -37,6 +39,14 @@ export function DeckStats({ adapter, lines, cards, statuses }: { adapter: GameAd
     .sort((a, b) => b.card!.price! * b.missing - a.card!.price! * a.missing)
     .slice(0, 5);
 
+  const rules = tagRulesFor(adapter);
+  const roleCount = new Map<string, number>();
+  for (const l of lines.filter((x) => x.section === adapter.sections[0].id)) {
+    const c = cards.get(l.cardId);
+    for (const t of c ? cardTags(c, rules) : []) roleCount.set(t, (roleCount.get(t) ?? 0) + l.qty);
+  }
+  const roles = [...roleCount].sort((a, b) => b[1] - a[1]);
+
   return (
     <div className="grid2">
       <div className="panel">
@@ -52,6 +62,20 @@ export function DeckStats({ adapter, lines, cards, statuses }: { adapter: GameAd
         </div>
         {subtypes.length > 0 && (
           <p className="small muted" style={{ marginTop: '0.75rem' }}>{subtypes.map(([s, n]) => `${n} ${s}`).join(' · ')}</p>
+        )}
+        {roles.length > 0 && (
+          <>
+            <h3 style={{ marginTop: '1.25rem' }}>Roles <span className="muted small">(cards with each role tag, main deck)</span></h3>
+            <div className="stack" style={{ gap: '0.4rem' }}>
+              {roles.map(([t, n]) => (
+                <div key={t} className="bar-row">
+                  <span className="bar-label"><LabelChip name={t} /></span>
+                  <span className="bar-track"><span className="bar-fill" style={{ width: `${(n / Math.max(1, total)) * 100}%` }} /></span>
+                  <span className="num small">{n}</span>
+                </div>
+              ))}
+            </div>
+          </>
         )}
         {curve.length > 0 && (
           <>

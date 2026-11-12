@@ -4,6 +4,7 @@ import * as actions from '../../app/actions';
 import { repo } from '../../app/repo';
 import { useLoad } from '../../app/useLoad';
 import { isStale } from '../../app/cardData';
+import { cardTags, searchCards, tagRulesFor } from '../../domain/cardText';
 import { countCards, diffLists } from '../../domain/decklist';
 import { coverArt, deckValue, formatRecord, formatUsd, illegalCards, totalRecord, type MatchRecord } from '../../domain/insights';
 import { plural } from '../text';
@@ -13,7 +14,7 @@ import type { Card, CopyDelta, DeckLine } from '../../domain/types';
 import { deckCount, describeIssue, sizeLabel, validateDeck } from '../../domain/rules';
 import { pendingParentChanges } from '../../domain/variants';
 import { getGame } from '../../games';
-import { CopyButton, DiffView, Empty, ErrorBox, GameBadge, Loading, MoreMenu } from '../components';
+import { CopyButton, DiffView, Empty, ErrorBox, GameBadge, LabelChip, Loading, MoreMenu } from '../components';
 import { useToast } from '../toast';
 import { CardDialog } from './CardDialog';
 import { CardList, type View } from './CardList';
@@ -24,7 +25,7 @@ import { SharePanel } from './SharePanel';
 import { UpdateFromList } from './UpdateFromList';
 import { useTitle } from '../useTitle';
 import { downloadText } from '../download';
-import { CompareWith, LogResult, MakeVariant, Purpose } from './DeckParts';
+import { CompareWith, Labels, LogResult, MakeVariant } from './DeckParts';
 import { deckGuide } from './deckGuide';
 
 async function load(id: string) {
@@ -80,6 +81,8 @@ function DeckView({ id }: { id: string }) {
   const [comparing, setComparing] = useState<number>();
   const [tagFilter, setTagFilter] = useState<string>();
   const [cardFilter, setCardFilter] = useState<'all' | 'missing' | 'away'>('all');
+  const [cardQuery, setCardQuery] = useState('');
+  const [role, setRole] = useState<string>();
   const [updateBase, setUpdateBase] = useState(0);
   const [checking, setChecking] = useState(false);
   const [legalTick, setLegalTick] = useState(0);
@@ -88,7 +91,8 @@ function DeckView({ id }: { id: string }) {
   useTitle(data?.deck.name);
   const lines = useMemo(() => data?.changes.at(-1)?.lines ?? [], [data]);
   const cards = useMemo(() => data?.cards ?? new Map<string, Card>(), [data]);
-  const statuses = useMemo(() => (data ? slotStatuses(data.deck.id, lines, data.copies) : new Map<string, SlotStatus>()), [data, lines]);
+  const lockedIds = useMemo(() => new Set((data?.decks ?? []).filter((d) => d.locked).map((d) => d.id)), [data]);
+  const statuses = useMemo(() => (data ? slotStatuses(data.deck.id, lines, data.copies, lockedIds) : new Map<string, SlotStatus>()), [data, lines, lockedIds]);
   const adapter = data ? getGame(data.deck.game) : undefined;
   const format = data?.deck.format;
   const confirmed = useMemo(() => {
@@ -148,15 +152,31 @@ function DeckView({ id }: { id: string }) {
   const { deck, changes, copies, decks, parent, parentChanges, children, childLines, childRecords } = data;
   const record = totalRecord(changes.map((c) => c.result));
   // Cards filter: missing = not owned at all; away = owned but in the binder or another deck.
-  const shownLines = cardFilter === 'all' ? lines : lines.filter((l) => {
+  const roleRules = tagRulesFor(adapter);
+  const tagsOf = (cardId: string) => { const c = cards.get(cardId); return c ? cardTags(c, roleRules) : []; };
+  const roles = [...new Set(lines.flatMap((l) => tagsOf(l.cardId)))].sort();
+  // Name, role or rules text; lines without card data match by name only.
+  const queried = cardQuery.trim()
+    ? new Set(searchCards(lines.map((l) => cards.get(l.cardId) ?? { game: deck.game, id: l.cardId, name: l.name }), cardQuery, (c) => tagsOf(c.id)).map((c) => c.id))
+    : undefined;
+  const shownLines = lines.filter((l) => {
+    if (queried && !queried.has(l.cardId)) return false;
+    if (role && !tagsOf(l.cardId).includes(role)) return false;
+    if (cardFilter === 'all') return true;
     const st = statuses.get(l.cardId);
     return cardFilter === 'missing' ? (st?.missing ?? 0) > 0 : !!st && st.inDeck < st.needed && st.missing < st.needed - st.inDeck;
   });
+  const filtering = cardFilter !== 'all' || !!queried || !!role;
   const historyTags = [...new Set(changes.flatMap((c) => c.tags))].sort();
   const cover = coverArt(lines, cards);
   const summary = summarize(deck.id, lines, copies);
   const value = deckValue(lines, cards, statuses);
   const deckName = (did: string) => decks.find((d) => d.id === did)?.name ?? 'another deck';
+  const isLocked = (did: string) => lockedIds.has(did);
+  const knownLabels = [...new Set(decks.flatMap((d) => d.labels ?? []))].sort();
+  const inDeckTotal = copies.filter((c) => c.location === deck.id).reduce((n, c) => n + c.qty, 0);
+  // Locked decks keep their cards: Gather only offers the binder and decks in rotation.
+  const gatherable = [...statuses.values()].reduce((n, s) => n + s.inBinder + s.inOtherDecks.filter((o) => !isLocked(o.deckId)).reduce((m, o) => m + o.qty, 0), 0);
   const pending = parent ? pendingParentChanges(deck, parentChanges) : [];
   const rules = adapter.deckRules(deck.format);
   const issues = validateDeck(lines, rules, cards);
@@ -203,6 +223,16 @@ function DeckView({ id }: { id: string }) {
     if (name && name !== deck.name) run(() => touch({ name }), 'Deck renamed');
   };
 
+  const archive = () => {
+    if (!window.confirm(`Archive "${deck.name}"?
+
+All ${inDeckTotal} copies in it go back to your binder. The list and history stay; the deck moves to Empty decks.`)) return;
+    run(async () => {
+      const deltas = await actions.archiveDeck(repo, deck);
+      toast(`Archived ${deck.name}: ${actions.movedCount(deltas)} copies went to the binder`, 'ok', undo(deltas));
+    });
+  };
+
   const remove = () => {
     const inDeck = copies.filter((c) => c.location === deck.id).reduce((n, c) => n + c.qty, 0);
     const msg = `Delete "${deck.name}"?\n\n${inDeck} owned copies in it go back to your binder. Its change history is deleted and cannot be restored.`;
@@ -233,8 +263,10 @@ function DeckView({ id }: { id: string }) {
           <div className="deck-title">
             {cover && <img className="deck-title-art" src={cover} alt="" />}
             <h1>{deck.name}</h1>
+            {deck.locked && <span className="chip" title="Its cards are not offered for gathering into other decks">Locked</span>}
           </div>
-          <Purpose value={deck.purpose} onSave={(purpose) => run(() => touch({ purpose: purpose || undefined }), 'Saved')} />
+          <Labels value={deck.labels} known={knownLabels} onSave={(labels) => run(() => touch({ labels: labels.length ? labels : undefined }))} />
+          {deck.purpose && <p className="purpose small"><span className="muted">When to play:</span> {deck.purpose}</p>}
           {parent && (
             <p className="muted small">
               Variant of <Link to={`/decks/${parent.id}`}>{parent.name}</Link>
@@ -250,6 +282,10 @@ function DeckView({ id }: { id: string }) {
             { label: 'Rename', onClick: rename },
             { label: 'Duplicate (independent copy)', onClick: () => run(async () => { const c = await actions.duplicateDeck(repo, deck, `${deck.name} copy`); toast(`Made ${c.name}`); navigate(`/decks/${c.id}`); }) },
             { label: 'Update from a list', disabled: !!draft, onClick: () => { setTab('cards'); setUpdating(true); setUpdateBase(changes.at(-1)?.seq ?? 0); } },
+            deck.locked
+              ? { label: 'Put back in rotation', onClick: () => run(() => touch({ locked: undefined }), 'Back in rotation') }
+              : { label: 'Lock (keep its cards here)', onClick: () => run(() => touch({ locked: true }), 'Locked: its cards stay out of other decks') },
+            { label: 'Archive (all cards to binder)…', disabled: inDeckTotal === 0, onClick: archive },
             { label: 'Delete deck…', onClick: remove, danger: true },
           ]} />
         </div>
@@ -278,9 +314,9 @@ function DeckView({ id }: { id: string }) {
           {value.toComplete > 0 && <span className="small muted">To complete <strong className="text">{formatUsd(value.toComplete)}</strong></span>}
           {record.events > 0 && <span className="small muted">Record <strong className="text">{formatRecord(record)}</strong> over {plural(record.events, 'event')}</span>}
           <span style={{ flex: 1 }} />
-          {(summary.inBinder > 0 || summary.inOtherDecks > 0) && (
+          {gatherable > 0 && (
             <button type="button" className="small" onClick={() => setGathering((v) => !v)} aria-expanded={gathering}>
-              Gather {summary.inBinder + summary.inOtherDecks} cards
+              Gather {gatherable} cards
             </button>
           )}
           {summary.extra.length > 0 && (
@@ -295,7 +331,7 @@ function DeckView({ id }: { id: string }) {
       <ErrorBox error={actionError} />
 
       {gathering && (
-        <GatherPanel lines={lines} statuses={statuses} deckName={deckName} onClose={() => setGathering(false)}
+        <GatherPanel lines={lines} statuses={statuses} deckName={deckName} isLocked={isLocked} onClose={() => setGathering(false)}
           onGather={(from, label) => run(async () => {
             const deltas = await actions.gatherFrom(repo, deck, lines, from);
             toast(`Moved ${plural(actions.movedCount(deltas), 'card')} from ${label} into ${deck.name}`, 'ok', undo(deltas));
@@ -378,6 +414,7 @@ function DeckView({ id }: { id: string }) {
               <button type="button" onClick={() => setLogging((v) => !v)} aria-expanded={logging}>Log a result</button>
             </div>
             <div className="row">
+            <input value={cardQuery} onChange={(e) => setCardQuery(e.target.value)} placeholder="Find: name, role or text" aria-label="Find a card in this deck" style={{ minWidth: '12rem' }} />
             <div className="segmented" role="group" aria-label="Show cards">
               {([['all', 'All'], ['missing', 'Missing'], ['away', 'Not in deck']] as const).map(([v, label]) => (
                 <button key={v} type="button" aria-pressed={cardFilter === v} className={cardFilter === v ? 'on' : ''} onClick={() => setCardFilter(v)}>{label}</button>
@@ -389,17 +426,32 @@ function DeckView({ id }: { id: string }) {
             </div>
             </div>
           </div>
+          {roles.length > 0 && (
+            <div className="row labels" aria-label="Filter by role">
+              <span className="muted small">Roles:</span>
+              {roles.map((t) => <LabelChip key={t} name={t} active={role === t} onClick={() => setRole(role === t ? undefined : t)} />)}
+            </div>
+          )}
           {logging && (
             <LogResult onCancel={() => setLogging(false)}
               onSave={(result, note) => run(async () => { await actions.saveChange(repo, deck, lines, { tags: ['result'], result, note }, { baseSeq: changes.at(-1)?.seq ?? 0 }); setLogging(false); }, 'Result logged')} />
           )}
-          {shownLines.length === 0 && cardFilter !== 'all' && <p className="muted small">{cardFilter === 'missing' ? 'Nothing missing: you own every card in this deck.' : 'Every owned copy is already in this deck.'}</p>}
-          {(shownLines.length > 0 || cardFilter === 'all') && <CardList adapter={adapter} lines={shownLines} statuses={statuses} cards={cards} illegal={illegal} format={format} view={view} deckName={deckName}
+          {shownLines.length === 0 && filtering && <p className="muted small">{queried || role ? 'No cards in this deck match.' : cardFilter === 'missing' ? 'Nothing missing: you own every card in this deck.' : 'Every owned copy is already in this deck.'}</p>}
+          {(shownLines.length > 0 || !filtering) && <CardList adapter={adapter} lines={shownLines} statuses={statuses} cards={cards} illegal={illegal} format={format} view={view} deckName={deckName} isLocked={isLocked}
             onOpen={setDetail}
             onMove={(l, from, qty) => moveInto(l.cardId, l.name, from, qty)} />}
           {detail && (
-            <CardDialog adapter={adapter} deckId={deck.id} line={detail} card={cards.get(detail.cardId)} status={statuses.get(detail.cardId)} deckName={deckName}
+            <CardDialog adapter={adapter} deckId={deck.id} line={detail} card={cards.get(detail.cardId)} status={statuses.get(detail.cardId)} deckName={deckName} isLocked={isLocked}
               onClose={() => setDetail(undefined)}
+              onTakeOut={(qty, updateList) => run(async () => {
+                const deltas = await actions.takeOut(repo, deck, detail, qty, updateList);
+                toast(updateList ? `Removed ${qty} ${detail.name}; they went to the binder` : `Took out ${qty} ${detail.name}; the deck still needs them`, 'ok', undo(deltas));
+                if (updateList && qty >= detail.qty) setDetail(undefined);
+              })}
+              onTrim={(qty) => run(async () => {
+                await actions.setLineQty(repo, deck, detail, qty);
+                if (qty === 0) setDetail(undefined); else setDetail({ ...detail, qty });
+              }, 'List updated')}
               onMove={(from, qty) => moveInto(detail.cardId, detail.name, from, qty)}
               onAcquired={(qty) => {
                 const deltas = [{ cardId: detail.cardId, location: deck.id, delta: qty }];
@@ -466,8 +518,8 @@ function DeckView({ id }: { id: string }) {
         <div className="panel stack">
           <p className="muted small">A variant is a copy of this deck that remembers where it came from. Use one for a different meta, a budget build or a test. When this deck changes, its variants can apply the change too. Variants share your physical cards; nothing is copied.</p>
           <CompareWith deck={deck} lines={lines} decks={decks.filter((d) => d.game === deck.game && d.id !== deck.id)} />
-          <MakeVariant defaultName={`${deck.name} variant`}
-            onMake={(name, purpose) => run(async () => { const v = await actions.makeVariant(repo, deck, name, purpose); toast(`Made ${v.name}`); navigate(`/decks/${v.id}`); })} />
+          <MakeVariant defaultName={`${deck.name} variant`} known={knownLabels}
+            onMake={(name, labels) => run(async () => { const v = await actions.makeVariant(repo, deck, name, labels); toast(`Made ${v.name}`); navigate(`/decks/${v.id}`); })} />
           {children.length > 0 && (
             <ul className="deck-tree">
               {children.map((c) => {
@@ -476,7 +528,7 @@ function DeckView({ id }: { id: string }) {
                   <li key={c.id} className="deck-row">
                     <span className="stack" style={{ gap: 0 }}>
                       <Link to={`/decks/${c.id}`}>{c.name}</Link>
-                      {c.purpose && <span className="muted small">When: {c.purpose}</span>}
+                      {(c.labels?.length ?? 0) > 0 && <span className="row">{c.labels!.map((l) => <LabelChip key={l} name={l} />)}</span>}
                     </span>
                     {d.length ? <DiffView diff={d} /> : <span className="muted small">same cards</span>}
                     {(childRecords.get(c.id)?.events ?? 0) > 0 && <span className="chip">{formatRecord(childRecords.get(c.id)!)}</span>}

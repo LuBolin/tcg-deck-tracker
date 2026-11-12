@@ -6,6 +6,7 @@ import { games } from '../games';
 import { ErrorBox } from './components';
 import { markBackedUp } from './backup';
 import { applyTheme, readTheme, type Theme } from './theme';
+import { setTracksUnlimited, tracksUnlimited } from '../app/supply';
 import { useTitle } from './useTitle';
 
 export function SettingsPage() {
@@ -111,6 +112,7 @@ export function SettingsPage() {
           ))}
         </div>
       </div>
+      <UnlimitedCards />
       <div className="panel stack">
         <h2>Card data</h2>
         <p className="muted">Prices, legality and banlists change. Each deck refreshes its own cards when they are a week old; this refreshes every deck now.</p>
@@ -135,5 +137,31 @@ export function SettingsPage() {
         </ul>
       </div>
     </>
+  );
+}
+
+/** Per game: treat basic cards (Pokémon basic Energy) as an endless supply, or count them like any card. */
+function UnlimitedCards() {
+  const list = games().filter((g) => g.unlimited);
+  const [on, setOn] = useState<Record<string, boolean>>(() => Object.fromEntries(list.map((g) => [g.id, tracksUnlimited(g.id)])));
+  if (list.length === 0) return null;
+  return (
+    <div className="panel stack">
+      <h2>Basic cards</h2>
+      {list.map((g) => (
+        <div key={g.id} className="stack" style={{ gap: '0.25rem' }}>
+          <label className="row">
+            <input type="checkbox" checked={!!on[g.id]} onChange={(e) => { setTracksUnlimited(g.id, e.target.checked); setOn({ ...on, [g.id]: e.target.checked }); }} />
+            Track my {g.unlimited!.label} ({g.name})
+          </label>
+          <p className="muted small" style={{ margin: 0 }}>
+            {on[g.id]
+              ? `Your ${g.unlimited!.label} is counted like any other card: add copies to the binder or a deck, including special prints. Copies count by name, whatever the print.`
+              : `Off: ${g.unlimited!.label} is always available, so it never shows as missing or in want-lists. Turn this on to count your copies, for example special-print cards.`}
+          </p>
+        </div>
+      ))}
+      <p className="small muted" style={{ margin: 0 }}>Saved in this browser.</p>
+    </div>
   );
 }

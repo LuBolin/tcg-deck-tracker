@@ -5,7 +5,8 @@ import { deckCount, describeIssue, sizeLabel, validateDeck } from '../../domain/
 import { formatUsd } from '../../domain/insights';
 import { REASON_TAGS, type Card, type DeckLine } from '../../domain/types';
 import type { GameAdapter } from '../../games/types';
-import { DiffView, ErrorBox, TagPicker } from '../components';
+import { DiffView, ErrorBox, FilterChips, TagPicker } from '../components';
+import { cardTypes, typeOptions } from '../../domain/cardText';
 import { groupLines } from './group';
 
 export function EditList({ adapter, format, cards, lines, draft, setDraft, onSave, usedTags = [] }: {
@@ -116,6 +117,7 @@ function AddCard({ adapter, onAdd }: { adapter: GameAdapter; onAdd: (card: Card,
   const [q, setQ] = useState('');
   const [section, setSection] = useState(adapter.sections.find((s) => s.id === 'main')?.id ?? adapter.sections[0].id);
   const [results, setResults] = useState<Card[]>();
+  const [type, setType] = useState<string>();
   const [busy, setBusy] = useState(false);
   const [added, setAdded] = useState<string>();
   const [error, setError] = useState<string>();
@@ -126,6 +128,7 @@ function AddCard({ adapter, onAdd }: { adapter: GameAdapter; onAdd: (card: Card,
     setBusy(true);
     try {
       setResults(await adapter.search(q));
+      setType(undefined);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -135,7 +138,7 @@ function AddCard({ adapter, onAdd }: { adapter: GameAdapter; onAdd: (card: Card,
   return (
     <form onSubmit={search} style={{ marginTop: '1rem' }}>
       <div className="row">
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search a card to add" aria-label="Card search" style={{ flex: 1, minWidth: '10rem' }} />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search a card to add: name or effect" aria-label="Card search" style={{ flex: 1, minWidth: '10rem' }} />
         {adapter.sections.length > 1 && (
           <select value={section} onChange={(e) => setSection(e.target.value)} aria-label="Add to section">
             {adapter.sections.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
@@ -144,17 +147,18 @@ function AddCard({ adapter, onAdd }: { adapter: GameAdapter; onAdd: (card: Card,
         <button type="submit" disabled={busy}>{busy ? 'Searching…' : 'Search'}</button>
       </div>
       <ErrorBox error={error} />
+      {results && <FilterChips label="Type" options={typeOptions(results, adapter.categories)} value={type} onChange={setType} style={{ marginTop: '0.5rem' }} />}
       {results && (
         <div className="search-results">
           {results.length === 0 && <span className="muted small">No cards found.</span>}
-          {results.map((c) => (
+          {results.filter((c) => !type || cardTypes(c).includes(type)).map((c) => (
             <button key={`${c.id}|${c.set}|${c.number}`} type="button" className={added === c.id ? 'just-added' : ''}
               onClick={() => { onAdd(c, section); setAdded(c.id); }}>
               {c.imageUrl ? <img className="thumb" src={c.imageUrl} alt="" loading="lazy" /> : <span className="thumb" />}
               <span>
                 {c.name}
                 <br />
-                <span className="muted small">{[c.category, c.set, c.number].filter(Boolean).join(' · ')}{c.price !== undefined ? ` · ${formatUsd(c.price)}` : ''}</span>
+                <span className="muted small">{[c.category, c.subtype, c.limitGroup, c.set, c.number].filter(Boolean).join(' · ')}{c.price !== undefined ? ` · ${formatUsd(c.price)}` : ''}</span>
               </span>
             </button>
           ))}

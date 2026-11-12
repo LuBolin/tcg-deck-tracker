@@ -7,6 +7,7 @@ import { pendingParentChanges, type PendingParentChange } from '../domain/varian
 import type { Repository } from '../data/repository';
 import type { GameAdapter } from '../games/types';
 import { stamp } from './cardData';
+import { unlimitedFor } from './supply';
 
 /** Use cases. Each one combines domain rules with repository calls. */
 
@@ -173,7 +174,7 @@ export function addCopies(repo: Repository, game: string, cardId: string, locati
 
 /** Move every binder copy this deck can use into the deck. */
 export async function pullFromBinder(repo: Repository, deck: Deck, lines: DeckLine[]): Promise<number> {
-  const statuses = slotStatuses(deck.id, lines, await repo.listCopies(deck.game));
+  const statuses = slotStatuses(deck.id, lines, await repo.listCopies(deck.game), undefined, unlimitedFor(deck.game));
   const deltas = [...statuses.values()].flatMap((s) => moveDeltas(s.cardId, BINDER, deck.id, s.inBinder));
   if (deltas.length) await repo.adjustCopies(deck.game, deltas);
   return deltas.length / 2;
@@ -181,7 +182,7 @@ export async function pullFromBinder(repo: Repository, deck: Deck, lines: DeckLi
 
 /** Move copies the deck no longer uses back to the binder. */
 export async function returnExtras(repo: Repository, deck: Deck, lines: DeckLine[]): Promise<number> {
-  const { extra } = summarize(deck.id, lines, await repo.listCopies(deck.game));
+  const { extra } = summarize(deck.id, lines, await repo.listCopies(deck.game), unlimitedFor(deck.game));
   const deltas = extra.flatMap((e) => moveDeltas(e.cardId, deck.id, BINDER, e.qty));
   if (deltas.length) await repo.adjustCopies(deck.game, deltas);
   return extra.length;
@@ -202,7 +203,7 @@ export async function refreshCardData(repo: Repository, adapter: GameAdapter, li
 
 /** Move every copy this deck can use from one place (the binder or another deck) into it. Returns the changes made. */
 export async function gatherFrom(repo: Repository, deck: Deck, lines: DeckLine[], from: Location): Promise<CopyDelta[]> {
-  const statuses = slotStatuses(deck.id, lines, await repo.listCopies(deck.game));
+  const statuses = slotStatuses(deck.id, lines, await repo.listCopies(deck.game), undefined, unlimitedFor(deck.game));
   const deltas = [...statuses.values()].flatMap((s) => {
     const qty = from === BINDER ? s.inBinder : s.inOtherDecks.find((o) => o.deckId === from)?.qty ?? 0;
     return moveDeltas(s.cardId, from, deck.id, qty);

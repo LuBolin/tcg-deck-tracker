@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { latestLines } from '../app/actions';
 import { APP_NAME, repo } from '../app/repo';
+import { unlimitedFor } from '../app/supply';
 import { useLoad } from '../app/useLoad';
 import { ownedTotal } from '../domain/collection';
 import { slotStatuses } from '../domain/status';
@@ -64,7 +65,8 @@ function wantedRows(decks: Deck[], lines: Map<string, DeckLine[]>, copies: CopyR
   const needed = new Map<string, { line: DeckLine; sum: number; maxMissing: number }>();
   for (const d of decks) {
     const ls = lines.get(d.id) ?? [];
-    for (const st of slotStatuses(d.id, ls, copies).values()) {
+    for (const st of slotStatuses(d.id, ls, copies, undefined, unlimitedFor(d.game)).values()) {
+      if (st.unlimited) continue; // basic Energy: nobody needs to buy it
       const e = needed.get(st.cardId) ?? { line: ls.find((l) => l.cardId === st.cardId)!, sum: 0, maxMissing: 0 };
       e.sum += st.needed;
       e.maxMissing = Math.max(e.maxMissing, st.missing);

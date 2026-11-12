@@ -169,3 +169,14 @@ describe('set codes', () => {
     expect(splitTrailingSetNumber('Some Card 12 34')).toBeUndefined();
   });
 });
+
+describe('unlimited cards', () => {
+  it('count as in the deck, never missing, never extra, whatever copies exist', () => {
+    const free = (id: string) => id === 'energy';
+    const copies = [copy('energy', BINDER, 2), copy('energy', 'd1', 9)];
+    const st = slotStatuses('d1', [line('energy', 12), line('a', 1)], copies, undefined, free);
+    expect(st.get('energy')).toMatchObject({ inDeck: 12, inBinder: 0, missing: 0, unlimited: true });
+    expect(st.get('a')).toMatchObject({ missing: 1 });
+    expect(summarize('d1', [line('energy', 4)], copies, free).extra).toEqual([]);
+  });
+});

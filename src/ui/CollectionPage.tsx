@@ -3,6 +3,7 @@ import { Link } from 'react-router';
 import { addCopies, latestLines } from '../app/actions';
 import { toDeckLines } from '../app/importing';
 import { repo } from '../app/repo';
+import { unlimitedFor } from '../app/supply';
 import { useLoad } from '../app/useLoad';
 import { cardTotals } from '../domain/decklist';
 import { formatUsd } from '../domain/insights';
@@ -12,8 +13,8 @@ import { downloadText } from './download';
 import { BINDER } from '../domain/types';
 import { games } from '../games';
 import type { ResolvedLine } from '../games/types';
-import { Empty, ErrorBox, LabelChip, Loading } from './components';
-import { cardTags, searchCards, tagRulesFor } from '../domain/cardText';
+import { Empty, ErrorBox, FilterChips, LabelChip, Loading } from './components';
+import { cardTags, cardTypes, searchCards, tagRulesFor, typeOptions } from '../domain/cardText';
 import { useGameChoice } from './useGameChoice';
 import { plural } from './text';
 import { ListReader } from './ListReader';
@@ -26,7 +27,7 @@ async function load(game: string) {
   // Per card: decks that are short of it (copies missing, or sitting elsewhere).
   const needs = new Map<string, { deckId: string; short: number; missing: number }[]>();
   for (const d of decks) {
-    for (const st of slotStatuses(d.id, await latestLines(repo, d.id), copies).values()) {
+    for (const st of slotStatuses(d.id, await latestLines(repo, d.id), copies, undefined, unlimitedFor(game)).values()) {
       const short = st.needed - st.inDeck;
       if (short > 0) needs.set(st.cardId, [...(needs.get(st.cardId) ?? []), { deckId: d.id, short, missing: st.missing }]);
     }
@@ -42,6 +43,7 @@ export function CollectionPage() {
   const { data, error, reload } = useLoad(() => load(gameId), [gameId]);
   const [filter, setFilter] = useState('');
   const [role, setRole] = useState<string>();
+  const [type, setType] = useState<string>();
   const rules = useMemo(() => tagRulesFor(adapter), [adapter]);
   // Role tags per card, computed once per load.
   const tagsById = useMemo(() => new Map((data?.cards ?? []).map((c) => [c.id, cardTags(c, rules)])), [data, rules]);
@@ -72,6 +74,7 @@ export function CollectionPage() {
       }))
       .filter((r) => !matched || matched.has(r.cardId))
       .filter((r) => !role || (tagsById.get(r.cardId) ?? []).includes(role))
+      .filter((r) => !type || (!!r.card && cardTypes(r.card).includes(type)))
       .filter((r) =>
         show === 'missing' ? r.needs.some((n) => n.missing > 0)
         : r.total === 0 ? false
@@ -80,7 +83,8 @@ export function CollectionPage() {
         sort === 'value' ? (b.card?.price ?? 0) * b.total - (a.card?.price ?? 0) * a.total || a.name.localeCompare(b.name)
         : sort === 'count' ? b.total - a.total || a.name.localeCompare(b.name)
         : a.name.localeCompare(b.name));
-  }, [data, filter, show, sort, role, tagsById]);
+  }, [data, filter, show, sort, role, type, tagsById]);
+  const types = useMemo(() => typeOptions(data?.cards ?? [], adapter.categories), [data, adapter]);
   const roles = [...new Set(rows.flatMap((r) => tagsById.get(r.cardId) ?? []).concat(role ? [role] : []))].sort();
 
   const run = async (fn: () => Promise<unknown>) => {
@@ -168,12 +172,8 @@ export function CollectionPage() {
               {plural(total, 'copy', 'copies')}, {plural(rows.length, 'card')}{value > 0 && <> · about <strong className="text">{formatUsd(value)}</strong></>}
             </span>
           </div>
-          {roles.length > 0 && (
-            <div className="row labels" aria-label="Filter by role" style={{ marginBottom: '0.5rem' }}>
-              <span className="muted small">Roles:</span>
-              {roles.map((t) => <LabelChip key={t} name={t} active={role === t} onClick={() => setRole(role === t ? undefined : t)} />)}
-            </div>
-          )}
+          <FilterChips label="Type" options={types} value={type} onChange={setType} style={{ marginBottom: '0.5rem' }} />
+          <FilterChips label="Roles" options={roles} value={role} onChange={setRole} style={{ marginBottom: '0.5rem' }} />
           <table className="list">
             <thead><tr><th>Card</th><th className="num">Owned</th><th>Where</th><th>Needed by</th><th className="num">Value</th><th className="num">Binder</th></tr></thead>
             <tbody>

@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router';
 import { createDeck } from '../app/actions';
 import { readList, toDeckLines } from '../app/importing';
 import { currentAccount, repo } from '../app/repo';
+import { unlimitedFor } from '../app/supply';
 import { useLoad } from '../app/useLoad';
 import { countCards } from '../domain/decklist';
 import { coverArt, deckValue, formatRecord, formatUsd, totalRecord, type MatchRecord } from '../domain/insights';
@@ -44,9 +45,9 @@ async function load() {
       const lines = linesByDeck.get(d.id)!;
       info.set(d.id, {
         held: copies.filter((c) => c.location === d.id).reduce((n, c) => n + c.qty, 0),
-        summary: summarize(d.id, lines, copies),
+        summary: summarize(d.id, lines, copies, unlimitedFor(g)),
         mainCount: countCards(lines, 'main'),
-        value: deckValue(lines, cards, slotStatuses(d.id, lines, copies)).total,
+        value: deckValue(lines, cards, slotStatuses(d.id, lines, copies, undefined, unlimitedFor(g))).total,
         cover: coverArt(lines, cards),
         lastNote: notes.get(d.id),
         record: records.get(d.id)!,

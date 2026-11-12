@@ -121,5 +121,17 @@ export function searchCards<T extends Card>(cards: T[], query: string, tagsOf: (
   return scored.filter((s) => s.score > 0).sort((a, b) => b.score - a.score).map((s) => s.c);
 }
 
+/** A card's types for filtering: category ("Trainer"), subtype ("Supporter", "Stage 1") and limit group ("ACE SPEC"). */
+export const cardTypes = (card: Card): string[] => [...new Set([card.category, card.subtype, card.limitGroup].filter((t): t is string => !!t))];
+
+/** Type filter options present in these cards: each category followed by its subtypes, then limit groups. */
+export function typeOptions(cards: Card[], categoryOrder: string[]): string[] {
+  const rank = (c?: string) => (c && categoryOrder.includes(c) ? categoryOrder.indexOf(c) : categoryOrder.length);
+  const sorted = [...cards].sort((a, b) => rank(a.category) - rank(b.category) || (a.subtype ?? '').localeCompare(b.subtype ?? ''));
+  const main = sorted.flatMap((c) => [c.category, c.subtype]);
+  const groups = sorted.map((c) => c.limitGroup).sort();
+  return [...new Set([...main, ...groups].filter((t): t is string => !!t))];
+}
+
 /** Common rules plus a game's own, for `cardTags`. */
 export const tagRulesFor = (game?: { tagRules?: TagRule[] }) => [...COMMON_TAG_RULES, ...(game?.tagRules ?? [])];

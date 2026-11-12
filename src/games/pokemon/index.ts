@@ -82,6 +82,16 @@ export function normalizeEnergyName(name: string): string {
 const BASIC_ENERGY = new Set(Object.values(ENERGY_SYMBOLS).map((t) => `${t} Energy`.toLowerCase()));
 export const isBasicEnergy = (name: string) => BASIC_ENERGY.has(normalizeEnergyName(name).toLowerCase());
 
+/** Basic Energy card ids look like "energy:fire energy". */
+export const isBasicEnergyId = (id: string) => id.startsWith('energy:') && isBasicEnergy(id.slice('energy:'.length));
+
+/** Lower = more common. Unknown rarities sort with the rare cards, after the common ones. */
+const RARITY_ORDER = ['none', 'common', 'uncommon', 'rare', 'rare holo', 'promo', 'double rare', 'ace spec rare', 'radiant rare', 'ultra rare', 'shiny rare', 'illustration rare', 'shiny ultra rare', 'special illustration rare', 'hyper rare', 'secret rare'];
+export function rarityRank(rarity?: string): number {
+  const i = RARITY_ORDER.indexOf((rarity ?? 'none').toLowerCase());
+  return i === -1 ? RARITY_ORDER.indexOf('double rare') : i;
+}
+
 const norm = (s: string) => normalizeEnergyName(s).toLowerCase().replace(/[’']/g, "'").replace(/\s+/g, ' ').trim();
 
 /** FNV-1a, enough to tell apart two Pokemon with the same name but different stats. */
@@ -215,11 +225,8 @@ export function createPokemonAdapter(fetchFn: typeof fetchJson = fetchJson): Gam
 
   return {
     id: 'pokemon',
+    // Supporter, Item, Stadium… are card types (the Type filter), not roles.
     tagRules: [
-      { tag: 'supporter', test: (c) => c.subtype === 'Supporter' },
-      { tag: 'item', test: (c) => c.subtype === 'Item' },
-      { tag: 'tool', test: (c) => c.subtype === 'Tool' },
-      { tag: 'stadium', test: (c) => c.subtype === 'Stadium' },
       { tag: 'gust', phrases: ["switch opponent benched pokemon active", "opponent benched pokemon switch active"] },
       { tag: 'switch', phrases: ['switch active pokemon benched pokemon'], not: ['opponent benched pokemon'] },
       { tag: 'energy accel', phrases: ['attach energy from deck', 'attach energy from discard', 'search deck energy attach'] },
@@ -246,6 +253,20 @@ export function createPokemonAdapter(fetchFn: typeof fetchJson = fetchJson): Gam
     },
 
     resolve: (lines) => pool(lines, 6, resolveOne),
+
+    unlimited: { label: 'basic Energy', test: isBasicEnergyId },
+
+    /** Lowest rarity printing with the same text; ties go to Standard-legal, then the newest. */
+    async commonPrinting(cards) {
+      const out = new Map<string, Card>();
+      await pool(cards, 3, async (card) => {
+        const same = (await printings(card.name, 16).catch(() => [])).filter((c) => functionalId(c) === card.id);
+        // printings() is newest first and sort is stable, so equal ranks keep the newest first.
+        const best = same.sort((a, b) => rarityRank(a.rarity) - rarityRank(b.rarity) || Number(!a.legal?.standard) - Number(!b.legal?.standard))[0];
+        if (best) out.set(card.id, await toCard(best));
+      });
+      return out;
+    },
 
     /** play.limitlesstcg.com player decklists (online tournaments); its API allows browser requests. */
     async importUrl(url) {
@@ -278,11 +299,17 @@ export function createPokemonAdapter(fetchFn: typeof fetchJson = fetchJson): Gam
       return out;
     },
 
+    /** Names first, then Trainer and Energy rules text ("draw 3 cards"). TCGdex cannot search attack or Ability text. */
     async search(query) {
       const q = query.trim();
       if (!q) return [];
-      const list = await fetchFn<TcgdexBrief[]>(`${API}/cards?name=like:${encodeURIComponent(q)}&pagination:itemsPerPage=16`);
-      const briefs = list.filter((b) => !b.image?.includes('/tcgp/')).slice(0, 12);
+      const find = (field: string) =>
+        fetchFn<TcgdexBrief[]>(`${API}/cards?${field}=like:${encodeURIComponent(q)}&pagination:itemsPerPage=16`);
+      const settled = await Promise.allSettled([find('name'), find('effect')]);
+      if (settled.every((r) => r.status === 'rejected')) throw (settled[0] as PromiseRejectedResult).reason;
+      const [byName, byText] = settled.map((r) => (r.status === 'fulfilled' ? r.value : []));
+      const seen = new Set<string>();
+      const briefs = [...byName, ...byText].filter((b) => !b.image?.includes('/tcgp/') && !seen.has(b.id) && seen.add(b.id)).slice(0, 16);
       const cards = await pool(briefs, 8, async (b) => toCard(await getCard(b.id)).catch(() => undefined));
       return cards.filter((c): c is Card => !!c);
     },

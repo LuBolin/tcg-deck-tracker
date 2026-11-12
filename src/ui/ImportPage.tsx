@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { createDeck } from '../app/actions';
 import { toDeckLines } from '../app/importing';
+import { stamp } from '../app/cardData';
 import { repo } from '../app/repo';
 import { cardTotals, countCards, normalizeLines } from '../domain/decklist';
 import { formatUsd } from '../domain/insights';
@@ -27,7 +28,8 @@ export function ImportPage() {
   const [ownership, setOwnership] = useState<Ownership>('none');
   const [picked, setPicked] = useState<Record<string, number>>({});
   const [error, setError] = useState<string>();
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<string | false>(false);
+  const [commonPrint, setCommonPrint] = useState(false);
 
   const lines = useMemo(() => normalizeLines(toDeckLines(resolved)), [resolved]);
   /** Name idea: the commander or Leader, else the priciest card that is not a basic resource. */
@@ -51,14 +53,26 @@ export function ImportPage() {
   };
 
   const create = async () => {
-    setBusy(true);
+    setBusy('Creating…');
     setError(undefined);
     try {
+      let deckLines = lines;
+      if (commonPrint && adapter.commonPrinting) {
+        setBusy('Finding common printings…');
+        const cards = [...new Map(resolved.flatMap((r) => (r.card ? [[r.card.id, r.card] as const] : []))).values()];
+        const common = await adapter.commonPrinting(cards);
+        if (common.size) await repo.putCards(stamp([...common.values()]));
+        // The card id stays the same, so copies of any print still count; only the shown printing changes.
+        deckLines = lines.map((l) => {
+          const c = common.get(l.cardId);
+          return c ? { ...l, set: c.set, number: c.set ? c.number : undefined } : l;
+        });
+      }
       const owned = new Map<string, number>();
       for (const [cardId, qty] of totals) {
         owned.set(cardId, ownership === 'all' ? qty : ownership === 'none' ? 0 : Math.min(qty, picked[cardId] ?? qty));
       }
-      const deck = await createDeck(repo, { game: gameId, name: name.trim() || suggested, format, lines, owned });
+      const deck = await createDeck(repo, { game: gameId, name: name.trim() || suggested, format, lines: deckLines, owned });
       navigate(`/decks/${deck.id}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -67,7 +81,7 @@ export function ImportPage() {
   };
 
   const startEmpty = async () => {
-    setBusy(true);
+    setBusy('Creating…');
     try {
       const deck = await createDeck(repo, { game: gameId, name: name.trim() || `New ${adapter.name} deck`, format, lines: [] });
       navigate(`/decks/${deck.id}`);
@@ -100,7 +114,7 @@ export function ImportPage() {
           </label>
         </div>
         <p className="muted small" style={{ margin: 0 }}>
-          No list? <button type="button" className="link-button accent-link" onClick={startEmpty} disabled={busy}>Start an empty deck</button> and add cards by search.
+          No list? <button type="button" className="link-button accent-link" onClick={startEmpty} disabled={!!busy}>Start an empty deck</button> and add cards by search.
         </p>
         <ListReader key={gameId} adapter={adapter} initialText={carryText} onSwitchGame={changeGame} onChange={(r, u) => (setResolved(r), setUnresolved(u))} />
       </div>
@@ -171,10 +185,20 @@ export function ImportPage() {
               </tbody>
             </table>
           )}
+          {adapter.commonPrinting && (
+            <div className="stack" style={{ gap: '0.25rem' }}>
+              <label className="row">
+                <input type="checkbox" checked={commonPrint} onChange={(e) => setCommonPrint(e.target.checked)} /> Use the most common printing of each card
+              </label>
+              <p className="muted small" style={{ margin: 0 }}>
+                Ignores the set and number in the list and picks the lowest-rarity print, so prices are for the cheap version. Copies you own count whatever their print.
+              </p>
+            </div>
+          )}
           <ErrorBox error={error} />
           <div className="row">
-            <button type="button" className="primary" onClick={create} disabled={busy || unresolved > 0}>
-              Create deck
+            <button type="button" className="primary" onClick={create} disabled={!!busy || unresolved > 0}>
+              {busy || 'Create deck'}
             </button>
             {unresolved > 0 && <span className="muted small">Fix or remove the {plural(unresolved, 'problem line')} first.</span>}
           </div>

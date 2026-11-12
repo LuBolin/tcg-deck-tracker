@@ -103,7 +103,7 @@ export function CardDialog({ adapter, deckId, line, card, status, deckName, isLo
             <div className="row"><SlotChips status={status} deckName={deckName} isLocked={isLocked} /></div>
           </div>
 
-          {inDeck > 0 && (
+          {inDeck > 0 && !status?.unlimited && (
             <div className="stack takeout" style={{ gap: '0.4rem' }}>
               <span className="muted small">Take copies out to the binder</span>
               <div className="row">

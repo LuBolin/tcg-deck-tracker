@@ -16,6 +16,7 @@ export function HelpPage() {
             <li><span className="chip info">in binder</span> owned, waiting in the binder</li>
             <li><span className="chip warn">in Deck B</span> owned, but in another deck right now</li>
             <li><span className="chip bad">missing</span> you do not own enough copies</li>
+            <li><span className="chip ok">unlimited</span> basic Energy: always available unless you track it in Settings</li>
           </ul>
           <p className="small muted">Use <strong>Gather</strong> on a deck to pull its cards from the binder and other decks, with Undo.</p>
         </section>

@@ -50,3 +50,13 @@ describe('Magic burn and removal', () => {
     expect(cardTags(card('Lightning Bolt', 'Lightning Bolt deals 3 damage to any target.'), rules)).toEqual(['removal', 'burn']);
   });
 });
+
+describe('card types', async () => {
+  const { cardTypes, typeOptions } = await import('./cardText');
+  const c = (id: string, category: string, subtype?: string, limitGroup?: string) => ({ game: 'pokemon', id, name: id, category, subtype, limitGroup });
+  it('lists category, subtype and limit group, in category order', () => {
+    const cards = [c('a', 'Trainer', 'Supporter'), c('b', 'Pokémon', 'Stage 1'), c('d', 'Trainer', 'Item', 'ACE SPEC'), c('e', 'Pokémon', 'Basic')];
+    expect(cardTypes(cards[2])).toEqual(['Trainer', 'Item', 'ACE SPEC']);
+    expect(typeOptions(cards, ['Pokémon', 'Trainer', 'Energy'])).toEqual(['Pokémon', 'Basic', 'Stage 1', 'Trainer', 'Item', 'Supporter', 'ACE SPEC']);
+  });
+});

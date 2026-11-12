@@ -401,3 +401,43 @@ describe('pokemon needs a Basic', async () => {
     expect(needsBasic([line('drakloak')], new Map([card('drakloak')]))).toEqual([]); // unknown stage: no guess
   });
 });
+
+describe('pokemon common printing, unlimited Energy and text search', async () => {
+  const { createPokemonAdapter, rarityRank, isBasicEnergyId } = await import('./pokemon');
+  const T = 'https://api.tcgdex.net/v2/en';
+  const iono = (id: string, rarity: string, standard = true) => ({ id, localId: id.split('-')[1], name: 'Iono', category: 'Trainer', trainerType: 'Supporter', rarity, image: `img/${id}`, set: { id: 'pal', name: 'Paldea Evolved' }, legal: { standard } });
+  const { fn, calls } = fakeFetch([
+    [`${T}/cards?name=eq:Iono`, () => [{ id: 'pal-269', localId: '269', name: 'Iono', image: 'a' }, { id: 'pal-185', localId: '185', name: 'Iono', image: 'b' }, { id: 'pal-254', localId: '254', name: 'Iono', image: 'c' }]],
+    [`${T}/cards/pal-269`, () => iono('pal-269', 'Special illustration rare')],
+    [`${T}/cards/pal-185`, () => iono('pal-185', 'Uncommon')],
+    [`${T}/cards/pal-254`, () => iono('pal-254', 'Ultra Rare')],
+    [`${T}/cards?name=like:draw`, () => [{ id: 'pal-185', localId: '185', name: 'Iono', image: 'b' }]],
+    [`${T}/cards?effect=like:draw`, () => [{ id: 'pal-185', localId: '185', name: 'Iono', image: 'b' }, { id: 'pal-269', localId: '269', name: 'Iono', image: 'a' }]],
+    [`${T}/sets/pal`, () => ({ id: 'pal', abbreviation: { official: 'PAL' }, cards: [] })],
+    [`${T}/sets`, () => [{ id: 'pal' }]],
+  ]);
+  const adapter = createPokemonAdapter(fn);
+
+  it('ranks rarities from common to hyper rare', () => {
+    expect(rarityRank('Common')).toBeLessThan(rarityRank('Uncommon'));
+    expect(rarityRank('Double rare')).toBeLessThan(rarityRank('Special illustration rare'));
+    expect(rarityRank('Something new')).toBeGreaterThan(rarityRank('Rare'));
+  });
+
+  it('picks the lowest-rarity printing with the same card id', async () => {
+    const out = await adapter.commonPrinting!([{ game: 'pokemon', id: 'trainer:iono', name: 'Iono' }]);
+    expect(out.get('trainer:iono')).toMatchObject({ set: 'PAL', number: '185' });
+  });
+
+  it('treats only basic Energy as unlimited', () => {
+    expect(isBasicEnergyId('energy:fire energy')).toBe(true);
+    expect(adapter.unlimited!.test('energy:jet energy')).toBe(false);
+    expect(adapter.unlimited!.test('trainer:iono')).toBe(false);
+  });
+
+  it('searches names and rules text, without duplicates', async () => {
+    const found = await adapter.search('draw');
+    expect(calls.some((u) => u.startsWith(`${T}/cards?effect=like:draw`))).toBe(true);
+    expect(found.map((c) => c.number)).toEqual(['185', '269']);
+  });
+});

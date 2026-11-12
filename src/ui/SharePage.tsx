@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { importShared } from '../app/actions';
 import { repo } from '../app/repo';
+import { unlimitedFor } from '../app/supply';
 import { useLoad } from '../app/useLoad';
 import { countCards, diffLists } from '../domain/decklist';
 import { decodeShare } from '../domain/share';
@@ -46,8 +47,9 @@ export function SharePage() {
 
   const { shared, adapter, copies, decks } = data;
   const lines = shared.changes.at(-1)!.lines;
-  const statuses = slotStatuses(SHARED, lines, copies);
-  const summary = summarize(SHARED, lines, copies);
+  const unlimited = unlimitedFor(adapter.id);
+  const statuses = slotStatuses(SHARED, lines, copies, undefined, unlimited);
+  const summary = summarize(SHARED, lines, copies, unlimited);
   const deckName = (id: string) => decks.find((d) => d.id === id)?.name ?? 'a deck';
   const ownedNow = summary.inBinder + summary.inOtherDecks;
 

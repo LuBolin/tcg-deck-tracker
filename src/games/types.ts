@@ -39,6 +39,13 @@ export interface GameAdapter {
   /** Match parsed lines to cards. Unmatched lines come back without a card. */
   resolve(lines: ParsedLine[]): Promise<ResolvedLine[]>;
   search(query: string): Promise<Card[]>;
+  /**
+   * Optional: cards players have an endless supply of (Pokémon basic Energy). They never show as
+   * missing unless the player turns on tracking for them in Settings.
+   */
+  unlimited?: { label: string; test(cardId: string): boolean };
+  /** Optional: the most common (lowest rarity) printing of each card, by card id; cards without one are left out. */
+  commonPrinting?(cards: Card[]): Promise<Map<string, Card>>;
   /** Optional role tags for this game, added to the common ones (draw, removal, aoe…). */
   tagRules?: TagRule[];
   /**

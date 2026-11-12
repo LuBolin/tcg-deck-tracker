@@ -16,6 +16,8 @@ export interface SlotStatus {
   inOtherDecks: { deckId: string; qty: number }[];
   /** Copies the player does not own. */
   missing: number;
+  /** Always available (basic Energy): never missing, never moved. */
+  unlimited?: boolean;
 }
 
 export interface DeckSummary {
@@ -28,11 +30,15 @@ export interface DeckSummary {
   extra: { cardId: string; qty: number }[];
 }
 
+/** Cards the player has an endless supply of (basic Energy), unless they track them. */
+export type Unlimited = (cardId: string) => boolean;
+
 /**
  * Slot status per card for one deck. `copies` must be the rows of that deck's game.
  * Copies in `locked` decks are counted last, so decks in rotation are named first.
+ * `unlimited` cards count as in the deck, whatever copies are stored.
  */
-export function slotStatuses(deckId: string, lines: DeckLine[], copies: CopyRow[], locked: Set<string> = new Set()): Map<string, SlotStatus> {
+export function slotStatuses(deckId: string, lines: DeckLine[], copies: CopyRow[], locked: Set<string> = new Set(), unlimited?: Unlimited): Map<string, SlotStatus> {
   const byCard = new Map<string, CopyRow[]>();
   for (const c of copies) {
     if (c.qty <= 0) continue;
@@ -43,6 +49,10 @@ export function slotStatuses(deckId: string, lines: DeckLine[], copies: CopyRow[
 
   const out = new Map<string, SlotStatus>();
   for (const [cardId, needed] of cardTotals(lines)) {
+    if (unlimited?.(cardId)) {
+      out.set(cardId, { cardId, needed, inDeck: needed, inBinder: 0, inOtherDecks: [], missing: 0, unlimited: true });
+      continue;
+    }
     const rows = byCard.get(cardId) ?? [];
     let remaining = needed;
     const take = (available: number) => {
@@ -63,8 +73,8 @@ export function slotStatuses(deckId: string, lines: DeckLine[], copies: CopyRow[
   return out;
 }
 
-export function summarize(deckId: string, lines: DeckLine[], copies: CopyRow[]): DeckSummary {
-  const statuses = slotStatuses(deckId, lines, copies);
+export function summarize(deckId: string, lines: DeckLine[], copies: CopyRow[], unlimited?: Unlimited): DeckSummary {
+  const statuses = slotStatuses(deckId, lines, copies, undefined, unlimited);
   const s: DeckSummary = { needed: 0, inDeck: 0, inBinder: 0, inOtherDecks: 0, missing: 0, extra: [] };
   for (const st of statuses.values()) {
     s.needed += st.needed;
@@ -74,7 +84,7 @@ export function summarize(deckId: string, lines: DeckLine[], copies: CopyRow[]):
     s.missing += st.missing;
   }
   for (const c of copies) {
-    if (c.location !== deckId || c.qty <= 0) continue;
+    if (c.location !== deckId || c.qty <= 0 || statuses.get(c.cardId)?.unlimited) continue;
     const extra = c.qty - (statuses.get(c.cardId)?.needed ?? 0);
     if (extra > 0) s.extra.push({ cardId: c.cardId, qty: extra });
   }

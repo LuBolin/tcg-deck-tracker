@@ -2,9 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import * as actions from '../../app/actions';
 import { repo } from '../../app/repo';
+import { unlimitedFor } from '../../app/supply';
 import { useLoad } from '../../app/useLoad';
 import { isStale } from '../../app/cardData';
-import { cardTags, searchCards, tagRulesFor } from '../../domain/cardText';
+import { cardTags, cardTypes, searchCards, tagRulesFor, typeOptions } from '../../domain/cardText';
 import { countCards, diffLists } from '../../domain/decklist';
 import { coverArt, deckValue, formatRecord, formatUsd, illegalCards, totalRecord, type MatchRecord } from '../../domain/insights';
 import { plural } from '../text';
@@ -14,7 +15,7 @@ import type { Card, CopyDelta, DeckLine } from '../../domain/types';
 import { deckCount, describeIssue, sizeLabel, validateDeck } from '../../domain/rules';
 import { pendingParentChanges } from '../../domain/variants';
 import { getGame } from '../../games';
-import { CopyButton, DiffView, Empty, ErrorBox, GameBadge, LabelChip, Loading, MoreMenu } from '../components';
+import { CopyButton, DiffView, Empty, ErrorBox, FilterChips, GameBadge, LabelChip, Loading, MoreMenu } from '../components';
 import { useToast } from '../toast';
 import { CardDialog } from './CardDialog';
 import { CardList, type View } from './CardList';
@@ -83,6 +84,7 @@ function DeckView({ id }: { id: string }) {
   const [cardFilter, setCardFilter] = useState<'all' | 'missing' | 'away'>('all');
   const [cardQuery, setCardQuery] = useState('');
   const [role, setRole] = useState<string>();
+  const [type, setType] = useState<string>();
   const [updateBase, setUpdateBase] = useState(0);
   const [checking, setChecking] = useState(false);
   const [legalTick, setLegalTick] = useState(0);
@@ -92,7 +94,7 @@ function DeckView({ id }: { id: string }) {
   const lines = useMemo(() => data?.changes.at(-1)?.lines ?? [], [data]);
   const cards = useMemo(() => data?.cards ?? new Map<string, Card>(), [data]);
   const lockedIds = useMemo(() => new Set((data?.decks ?? []).filter((d) => d.locked).map((d) => d.id)), [data]);
-  const statuses = useMemo(() => (data ? slotStatuses(data.deck.id, lines, data.copies, lockedIds) : new Map<string, SlotStatus>()), [data, lines, lockedIds]);
+  const statuses = useMemo(() => (data ? slotStatuses(data.deck.id, lines, data.copies, lockedIds, unlimitedFor(data.deck.game)) : new Map<string, SlotStatus>()), [data, lines, lockedIds]);
   const adapter = data ? getGame(data.deck.game) : undefined;
   const format = data?.deck.format;
   const confirmed = useMemo(() => {
@@ -159,17 +161,19 @@ function DeckView({ id }: { id: string }) {
   const queried = cardQuery.trim()
     ? new Set(searchCards(lines.map((l) => cards.get(l.cardId) ?? { game: deck.game, id: l.cardId, name: l.name }), cardQuery, (c) => tagsOf(c.id)).map((c) => c.id))
     : undefined;
+  const types = typeOptions(lines.flatMap((l) => cards.get(l.cardId) ?? []), adapter.categories);
   const shownLines = lines.filter((l) => {
     if (queried && !queried.has(l.cardId)) return false;
+    if (type && !cardTypes(cards.get(l.cardId) ?? { game: deck.game, id: l.cardId, name: l.name, category: l.category }).includes(type)) return false;
     if (role && !tagsOf(l.cardId).includes(role)) return false;
     if (cardFilter === 'all') return true;
     const st = statuses.get(l.cardId);
     return cardFilter === 'missing' ? (st?.missing ?? 0) > 0 : !!st && st.inDeck < st.needed && st.missing < st.needed - st.inDeck;
   });
-  const filtering = cardFilter !== 'all' || !!queried || !!role;
+  const filtering = cardFilter !== 'all' || !!queried || !!role || !!type;
   const historyTags = [...new Set(changes.flatMap((c) => c.tags))].sort();
   const cover = coverArt(lines, cards);
-  const summary = summarize(deck.id, lines, copies);
+  const summary = summarize(deck.id, lines, copies, unlimitedFor(deck.game));
   const value = deckValue(lines, cards, statuses);
   const deckName = (did: string) => decks.find((d) => d.id === did)?.name ?? 'another deck';
   const isLocked = (did: string) => lockedIds.has(did);
@@ -426,17 +430,13 @@ All ${inDeckTotal} copies in it go back to your binder. The list and history sta
             </div>
             </div>
           </div>
-          {roles.length > 0 && (
-            <div className="row labels" aria-label="Filter by role">
-              <span className="muted small">Roles:</span>
-              {roles.map((t) => <LabelChip key={t} name={t} active={role === t} onClick={() => setRole(role === t ? undefined : t)} />)}
-            </div>
-          )}
+          <FilterChips label="Type" options={types} value={type} onChange={setType} />
+          <FilterChips label="Roles" options={roles} value={role} onChange={setRole} />
           {logging && (
             <LogResult onCancel={() => setLogging(false)}
               onSave={(result, note) => run(async () => { await actions.saveChange(repo, deck, lines, { tags: ['result'], result, note }, { baseSeq: changes.at(-1)?.seq ?? 0 }); setLogging(false); }, 'Result logged')} />
           )}
-          {shownLines.length === 0 && filtering && <p className="muted small">{queried || role ? 'No cards in this deck match.' : cardFilter === 'missing' ? 'Nothing missing: you own every card in this deck.' : 'Every owned copy is already in this deck.'}</p>}
+          {shownLines.length === 0 && filtering && <p className="muted small">{queried || role || type ? 'No cards in this deck match.' : cardFilter === 'missing' ? 'Nothing missing: you own every card in this deck.' : 'Every owned copy is already in this deck.'}</p>}
           {(shownLines.length > 0 || !filtering) && <CardList adapter={adapter} lines={shownLines} statuses={statuses} cards={cards} illegal={illegal} format={format} view={view} deckName={deckName} isLocked={isLocked}
             onOpen={setDetail}
             onMove={(l, from, qty) => moveInto(l.cardId, l.name, from, qty)} />}

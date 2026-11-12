@@ -17,6 +17,7 @@ export function Empty({ children }: { children: ReactNode }) {
 /** Status chips for one card slot: in deck, in binder, in other decks, missing. */
 export function SlotChips({ status, deckName, isLocked = () => false }: { status?: SlotStatus; deckName: (id: string) => string; isLocked?: (id: string) => boolean }) {
   if (!status) return null;
+  if (status.unlimited) return <span className="chip ok" title="Always available. Turn on tracking in Settings to count your copies.">unlimited</span>;
   // Locked decks are put away: one chip for all of them keeps the row short.
   const locked = status.inOtherDecks.filter((o) => isLocked(o.deckId));
   const lockedQty = locked.reduce((n, o) => n + o.qty, 0);
@@ -30,6 +31,17 @@ export function SlotChips({ status, deckName, isLocked = () => false }: { status
       {lockedQty > 0 && <span className="chip" title={locked.map((o) => `${o.qty} in ${deckName(o.deckId)}`).join(', ')}>{lockedQty} in locked decks</span>}
       {status.missing > 0 && <span className="chip bad" title="Copies you do not own">{status.missing} missing</span>}
     </>
+  );
+}
+
+/** One-choice filter as a row of chips (card types, roles). Click the active chip again to clear it. */
+export function FilterChips({ label, options, value, onChange, style }: { label: string; options: string[]; value?: string; onChange: (v?: string) => void; style?: CSSProperties }) {
+  if (options.length === 0) return null;
+  return (
+    <div className="row labels" role="group" aria-label={`Filter by ${label.toLowerCase()}`} style={style}>
+      <span className="muted small">{label}:</span>
+      {options.map((t) => <LabelChip key={t} name={t} active={value === t} onClick={() => onChange(value === t ? undefined : t)} />)}
+    </div>
   );
 }
 

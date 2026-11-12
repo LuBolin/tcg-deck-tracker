@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { createDeck } from '../app/actions';
 import { readList, toDeckLines } from '../app/importing';
-import { repo } from '../app/repo';
+import { currentAccount, repo } from '../app/repo';
 import { useLoad } from '../app/useLoad';
 import { countCards } from '../domain/decklist';
 import { coverArt, deckValue, formatRecord, formatUsd, totalRecord, type MatchRecord } from '../domain/insights';
@@ -82,7 +82,8 @@ export function DecksPage() {
   if (!data) return <Loading />;
 
   const q = query.trim().toLowerCase();
-  const showNudge = nudge && shouldNudgeBackup(data.decks.length);
+  // Signed in, the account keeps the data: no "saved only in this browser" reminder.
+  const showNudge = nudge && !currentAccount() && shouldNudgeBackup(data.decks.length);
   const compare = (a: DeckNode, b: DeckNode) =>
     sort === 'recent' ? b.deck.updatedAt.localeCompare(a.deck.updatedAt)
     : sort === 'missing' ? data.info.get(b.deck.id)!.summary.missing - data.info.get(a.deck.id)!.summary.missing

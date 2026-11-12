@@ -1,11 +1,12 @@
+import { rolesFor } from '../../app/prefs';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import * as actions from '../../app/actions';
-import { repo } from '../../app/repo';
+import { currentAccount, repo } from '../../app/repo';
 import { unlimitedFor } from '../../app/supply';
 import { useLoad } from '../../app/useLoad';
 import { isStale } from '../../app/cardData';
-import { cardTags, cardTypes, searchCards, tagRulesFor, typeOptions } from '../../domain/cardText';
+import { cardTags, cardTypes, searchCards, typeOptions } from '../../domain/cardText';
 import { countCards, diffLists } from '../../domain/decklist';
 import { coverArt, deckValue, formatRecord, formatUsd, illegalCards, totalRecord, type MatchRecord } from '../../domain/insights';
 import { plural } from '../text';
@@ -28,6 +29,8 @@ import { useTitle } from '../useTitle';
 import { downloadText } from '../download';
 import { CompareWith, Labels, LogResult, MakeVariant } from './DeckParts';
 import { deckGuide } from './deckGuide';
+import { VersionGraph } from './VersionGraph';
+import { deckFamily } from '../../domain/variants';
 
 async function load(id: string) {
   const deck = await repo.getDeck(id);
@@ -45,7 +48,10 @@ async function load(id: string) {
     childLines.set(c.id, ch.at(-1)?.lines ?? []);
     childRecords.set(c.id, totalRecord(ch.map((x) => x.result)));
   }
-  return { deck, changes, copies, decks, parent, parentChanges, cards, children, childLines, childRecords };
+  // The whole family (original deck and every variant), for the version graph.
+  const family = deckFamily(decks, deck.id);
+  const familyChanges = new Map(await Promise.all(family.map(async (d) => [d.id, d.id === deck.id ? changes : await repo.listChanges(d.id)] as const)));
+  return { deck, changes, copies, decks, parent, parentChanges, cards, children, childLines, childRecords, family, familyChanges };
 }
 
 /** Deeper legality results per session, so a deck is not re-checked on every visit. */
@@ -84,6 +90,7 @@ function DeckView({ id }: { id: string }) {
   const [cardFilter, setCardFilter] = useState<'all' | 'missing' | 'away'>('all');
   const [cardQuery, setCardQuery] = useState('');
   const [role, setRole] = useState<string>();
+  const [variantFrom, setVariantFrom] = useState<number>();
   const [type, setType] = useState<string>();
   const [updateBase, setUpdateBase] = useState(0);
   const [checking, setChecking] = useState(false);
@@ -151,10 +158,10 @@ function DeckView({ id }: { id: string }) {
   if (data === undefined || !adapter) return <Loading />;
   if (data === null) return <Empty>This deck does not exist. <Link to="/">Back to your decks</Link></Empty>;
 
-  const { deck, changes, copies, decks, parent, parentChanges, children, childLines, childRecords } = data;
+  const { deck, changes, copies, decks, parent, parentChanges, children, childLines, childRecords, family, familyChanges } = data;
   const record = totalRecord(changes.map((c) => c.result));
   // Cards filter: missing = not owned at all; away = owned but in the binder or another deck.
-  const roleRules = tagRulesFor(adapter);
+  const roleRules = rolesFor(adapter);
   const tagsOf = (cardId: string) => { const c = cards.get(cardId); return c ? cardTags(c, roleRules) : []; };
   const roles = [...new Set(lines.flatMap((l) => tagsOf(l.cardId)))].sort();
   // Name, role or rules text; lines without card data match by name only.
@@ -268,6 +275,7 @@ All ${inDeckTotal} copies in it go back to your binder. The list and history sta
             {cover && <img className="deck-title-art" src={cover} alt="" />}
             <h1>{deck.name}</h1>
             {deck.locked && <span className="chip" title="Its cards are not offered for gathering into other decks">Locked</span>}
+            {deck.isPublic && <span className="chip accent" title="Anyone signed in can view it; your followers see its changes">Public</span>}
           </div>
           <Labels value={deck.labels} known={knownLabels} onSave={(labels) => run(() => touch({ labels: labels.length ? labels : undefined }))} />
           {deck.purpose && <p className="purpose small"><span className="muted">When to play:</span> {deck.purpose}</p>}
@@ -289,6 +297,9 @@ All ${inDeckTotal} copies in it go back to your binder. The list and history sta
             deck.locked
               ? { label: 'Put back in rotation', onClick: () => run(() => touch({ locked: undefined }), 'Back in rotation') }
               : { label: 'Lock (keep its cards here)', onClick: () => run(() => touch({ locked: true }), 'Locked: its cards stay out of other decks') },
+            ...(currentAccount() ? [deck.isPublic
+              ? { label: 'Make private', onClick: () => run(() => touch({ isPublic: undefined }), 'Private: only you can see it') }
+              : { label: 'Make public', onClick: () => run(() => touch({ isPublic: true }), 'Public: your followers will see its changes') }] : []),
             { label: 'Archive (all cards to binder)…', disabled: inDeckTotal === 0, onClick: archive },
             { label: 'Delete deck…', onClick: remove, danger: true },
           ]} />
@@ -431,7 +442,7 @@ All ${inDeckTotal} copies in it go back to your binder. The list and history sta
             </div>
           </div>
           <FilterChips label="Type" options={types} value={type} onChange={setType} />
-          <FilterChips label="Roles" options={roles} value={role} onChange={setRole} />
+          <FilterChips label="Roles" options={roles} value={role} onChange={setRole} extra={<Link className="small" to="/settings#roles">Rename</Link>} />
           {logging && (
             <LogResult onCancel={() => setLogging(false)}
               onSave={(result, note) => run(async () => { await actions.saveChange(repo, deck, lines, { tags: ['result'], result, note }, { baseSeq: changes.at(-1)?.seq ?? 0 }); setLogging(false); }, 'Result logged')} />
@@ -468,6 +479,8 @@ All ${inDeckTotal} copies in it go back to your binder. The list and history sta
 
       {tab === 'history' && (
         <div className="panel">
+          <p className="small muted" style={{ marginTop: 0 }}>Every saved change, newest first.{' '}
+            <button type="button" className="link-button" onClick={() => setTab('variants')}>See the version graph</button> to follow this deck and its variants together.</p>
           {historyTags.length > 0 && (
             <div className="row" style={{ marginBottom: '0.75rem' }} role="group" aria-label="Filter by tag">
               <span className="muted small">Show:</span>
@@ -506,6 +519,7 @@ All ${inDeckTotal} copies in it go back to your binder. The list and history sta
                         run(() => actions.saveChange(repo, deck, c.lines, { tags: ['restore'], note: `Back to the list from change ${c.seq}` }), `Restored the list from change ${c.seq}`);
                       }
                     }}>Use this version again</button>
+                    <button type="button" className="small ghost" onClick={() => { setVariantFrom(c.seq); setTab('variants'); }}>Make a variant from this version</button>
                   </div>
                 )}
               </div>
@@ -517,9 +531,21 @@ All ${inDeckTotal} copies in it go back to your binder. The list and history sta
       {tab === 'variants' && (
         <div className="panel stack">
           <p className="muted small">A variant is a copy of this deck that remembers where it came from. Use one for a different meta, a budget build or a test. When this deck changes, its variants can apply the change too. Variants share your physical cards; nothing is copied.</p>
-          <CompareWith deck={deck} lines={lines} decks={decks.filter((d) => d.game === deck.game && d.id !== deck.id)} />
+          {family.length > 1 || changes.length > 1 ? (
+            <div>
+              <h2 style={{ marginTop: 0 }}>Version graph</h2>
+              <p className="muted small" style={{ marginTop: 0 }}>Every saved change in this deck family, newest first. Each color is one deck; curves show where a variant was made, dashed curves a change it took from its parent. Click a deck name to open it.</p>
+              <VersionGraph family={family} changes={familyChanges} currentId={deck.id} />
+            </div>
+          ) : null}
+          <h2>Make a variant</h2>
+          {variantFrom !== undefined && (
+            <p className="row small">Made from change {variantFrom} (an older version), not the latest.
+              <button type="button" className="small ghost" onClick={() => setVariantFrom(undefined)}>Use the latest instead</button></p>
+          )}
           <MakeVariant defaultName={`${deck.name} variant`} known={knownLabels}
-            onMake={(name, labels) => run(async () => { const v = await actions.makeVariant(repo, deck, name, labels); toast(`Made ${v.name}`); navigate(`/decks/${v.id}`); })} />
+            onMake={(name, labels) => run(async () => { const v = await actions.makeVariant(repo, deck, name, labels, variantFrom); toast(`Made ${v.name}`); navigate(`/decks/${v.id}`); })} />
+          {children.length > 0 && <h2>Variants of this deck</h2>}
           {children.length > 0 && (
             <ul className="deck-tree">
               {children.map((c) => {
@@ -537,6 +563,8 @@ All ${inDeckTotal} copies in it go back to your binder. The list and history sta
               })}
             </ul>
           )}
+          <h2>Compare</h2>
+          <CompareWith deck={deck} lines={lines} decks={decks.filter((d) => d.game === deck.game && d.id !== deck.id)} />
         </div>
       )}
     </>

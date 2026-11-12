@@ -1,11 +1,11 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useParams } from 'react-router';
 import { importShared } from '../app/actions';
-import { repo } from '../app/repo';
+import { currentSocial, repo } from '../app/repo';
 import { unlimitedFor } from '../app/supply';
 import { useLoad } from '../app/useLoad';
 import { countCards, diffLists } from '../domain/decklist';
-import { decodeShare } from '../domain/share';
+import { decodeShare, type SharedDeck } from '../domain/share';
 import { slotStatuses, summarize } from '../domain/status';
 import { games } from '../games';
 import { DiffView, Empty, ErrorBox, GameBadge, Loading, SlotChips } from './components';
@@ -17,10 +17,26 @@ import { useTitle } from './useTitle';
 /** The id statuses are computed for: no deck of mine, so nothing counts as "in deck". */
 const SHARED = '__shared__';
 
-async function load() {
+/** The deck from a share link (in the URL), or a public deck by id. */
+async function readShared(handle?: string, deckId?: string): Promise<{ decoded: SharedDeck; owner?: string }> {
+  if (deckId) {
+    const social = currentSocial();
+    if (!social) throw new Error('Sign in to see public decks.');
+    const found = await social.publicDeck(deckId);
+    if (!found) throw new Error('This deck is private or no longer exists.');
+    const { deck, changes } = found;
+    return {
+      owner: handle,
+      decoded: { v: 1, game: deck.game, name: deck.name, format: deck.format, purpose: deck.purpose, changes: changes.map((c) => ({ at: c.createdAt, tags: c.tags, note: c.note, result: c.result, lines: c.lines })) },
+    };
+  }
   const data = new URLSearchParams(location.hash.slice(1)).get('d');
   if (!data) throw new Error('This link has no deck in it.');
-  const decoded = await decodeShare(data);
+  return { decoded: await decodeShare(data) };
+}
+
+async function load(handle?: string, deckId?: string) {
+  const { decoded, owner } = await readShared(handle, deckId);
   const adapter = games().find((g) => g.id === decoded.game);
   if (!adapter) throw new Error(`This deck is for a game this app does not support (${decoded.game}).`);
   // A section this game does not have would be counted but never shown: put such lines in the main deck.
@@ -31,21 +47,22 @@ async function load() {
     changes: decoded.changes.map((c) => ({ ...c, lines: c.lines.map((l) => (known.has(l.section) ? l : { ...l, section: fallback })) })),
   };
   const [copies, decks] = await Promise.all([repo.listCopies(shared.game), repo.listDecks()]);
-  return { shared, adapter, copies, decks };
+  return { shared, adapter, copies, decks, owner };
 }
 
 /** A deck someone shared by link: their list and reasons, checked against my collection. */
 export function SharePage() {
   const navigate = useNavigate();
   const toast = useToast();
-  const { data, error } = useLoad(load, [location.hash]);
+  const { handle, deckId } = useParams();
+  const { data, error } = useLoad(() => load(handle, deckId), [location.hash, handle, deckId]);
   const [saving, setSaving] = useState(false);
   useTitle(data ? `Shared: ${data.shared.name}` : 'Shared deck');
 
   if (error) return <Empty><ErrorBox error={error} /><Link to="/">Go to your decks</Link></Empty>;
   if (!data) return <Loading />;
 
-  const { shared, adapter, copies, decks } = data;
+  const { shared, adapter, copies, decks, owner } = data;
   const lines = shared.changes.at(-1)!.lines;
   const unlimited = unlimitedFor(adapter.id);
   const statuses = slotStatuses(SHARED, lines, copies, undefined, unlimited);
@@ -69,7 +86,7 @@ export function SharePage() {
     <>
       <div className="spread">
         <div>
-          <div className="row"><GameBadge name={adapter.name} />{shared.format && <span className="muted small">{shared.format}</span>}<span className="chip">shared deck</span></div>
+          <div className="row"><GameBadge name={adapter.name} />{shared.format && <span className="muted small">{shared.format}</span>}{owner ? <span className="chip">public deck by <Link to={`/u/${owner}`}>@{owner}</Link></span> : <span className="chip">shared deck</span>}</div>
           <h1 style={{ marginTop: '0.4rem' }}>{shared.name}</h1>
           {shared.purpose && <p className="small"><span className="muted">When to play:</span> {shared.purpose}</p>}
         </div>

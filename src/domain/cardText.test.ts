@@ -60,3 +60,11 @@ describe('card types', async () => {
     expect(typeOptions(cards, ['Pokémon', 'Trainer', 'Energy'])).toEqual(['Pokémon', 'Basic', 'Stage 1', 'Trainer', 'Item', 'Supporter', 'ACE SPEC']);
   });
 });
+
+describe('role names', async () => {
+  const { tagRulesFor, cardTags } = await import('./cardText');
+  it('renames tags, ignoring blank names', () => {
+    const c = { game: 'mtg', id: 'x', name: 'Divination', text: 'Draw two cards.' };
+    expect(cardTags(c, tagRulesFor(undefined, { draw: 'card advantage', removal: '  ' }))).toEqual(['card advantage']);
+  });
+});

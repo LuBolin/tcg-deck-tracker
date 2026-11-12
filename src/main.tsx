@@ -10,6 +10,7 @@ import { ImportPage } from './ui/ImportPage';
 import { SettingsPage } from './ui/SettingsPage';
 import { SharePage } from './ui/SharePage';
 import { HelpPage } from './ui/HelpPage';
+import { ActivityPage, ProfilePage } from './ui/SocialPages';
 import { Shell } from './ui/Shell';
 import { WantPage } from './ui/WantPage';
 import './ui/styles.css';
@@ -29,6 +30,9 @@ const router = createBrowserRouter([
       { path: '/settings', element: <SettingsPage /> },
       { path: '/share', element: <SharePage /> },
       { path: '/help', element: <HelpPage /> },
+      { path: '/activity', element: <ActivityPage /> },
+      { path: '/u/:handle', element: <ProfilePage /> },
+      { path: '/u/:handle/decks/:deckId', element: <SharePage /> },
     ],
   },
 ], { basename: import.meta.env.BASE_URL.replace(/\/$/, '') || '/' });

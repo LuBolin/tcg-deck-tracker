@@ -68,6 +68,10 @@ export interface Deck {
   parentDeckId?: string;
   /** The parent's change this variant is based on (moves forward when parent changes are applied or dismissed). */
   parentChangeId?: string;
+  /** Signed-in players only: anyone can view the deck and its history, and followers see its changes. */
+  isPublic?: boolean;
+  /** The parent's change this variant was made from. Never moves, so the version graph can show where it started. */
+  originChangeId?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -84,6 +88,8 @@ export interface Change {
   note: string;
   /** Optional match result, for example "3-1 vs Deck X". */
   result: string;
+  /** For a change taken from the parent deck: that parent change. */
+  sourceChangeId?: string;
 }
 
 /** Count of physical copies of one card at one location. */

@@ -73,5 +73,21 @@ assert.deepEqual(await as(A, 'authenticated', `select * from prints`), [], 'A ca
 assert.match(String(await as(A, 'authenticated', `insert into prints (owner_id, game, card_id, print_id, qty) values ('${B}', 'demo', 'x', 'p', 1)`)), /row-level security/);
 await as(B, 'authenticated', `select import_all('{"version":1,"decks":[],"changes":[],"copies":[],"cards":[]}')`);
 assert.equal((await as(B, 'authenticated', `select count(*)::int n from prints`))[0].n, 0, 'old backups without prints clear them');
+// Social: profiles are public, follows are private to both sides, the feed shows only followed players' public decks.
+await as(A, 'authenticated', `insert into profiles (handle, display_name) values ('alice', 'Alice')`);
+await as(B, 'authenticated', `insert into profiles (handle) values ('bob')`);
+assert.match(String(await as(B, 'authenticated', `insert into profiles (id, handle) values ('${A}', 'spoof')`)), /row-level security|duplicate/);
+assert.match(String(await as(B, 'authenticated', `insert into profiles (handle) values ('Bad Handle!')`)), /check|duplicate/);
+assert.deepEqual((await as(null, 'anon', `select handle from profiles order by handle`)).map((r) => r.handle), ['alice', 'bob']);
+assert.deepEqual(await as(B, 'authenticated', `select deck_name from activity_feed()`), [], 'no follows, no feed');
+await as(B, 'authenticated', `insert into follows (followee_id) values ('${A}')`);
+assert.match(String(await as(B, 'authenticated', `insert into follows (follower_id, followee_id) values ('${A}', '${B}')`)), /row-level security/);
+const feed = await as(B, 'authenticated', `select deck_name, handle, seq from activity_feed()`);
+assert.ok(feed.length > 0 && feed.every((r) => r.deck_name === 'A public' && r.handle === 'alice'), 'feed shows only the public deck: ' + JSON.stringify(feed));
+const anonFollows = await as(null, 'anon', `select * from follows`);
+assert.ok(Array.isArray(anonFollows) ? anonFollows.length === 0 : /ERROR/.test(anonFollows), 'anon cannot read follows');
+assert.equal((await as(A, 'authenticated', `select count(*)::int n from follows where followee_id = '${A}'`))[0].n, 1, 'A sees who follows A');
+await as(A, 'authenticated', `insert into user_prefs (prefs) values ('{"role-names":{"draw":"card draw"}}')`);
+assert.deepEqual(await as(B, 'authenticated', `select * from user_prefs`), [], 'prefs are private');
 console.log('RLS checks passed');
 

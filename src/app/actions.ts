@@ -18,6 +18,8 @@ export interface ChangeInfo {
   tags?: string[];
   note?: string;
   result?: string;
+  /** The parent change this one copies (applied parent changes). */
+  sourceChangeId?: string;
 }
 
 export async function latestLines(repo: Repository, deckId: string): Promise<DeckLine[]> {
@@ -71,6 +73,7 @@ export async function saveChange(
     tags: info.tags ?? [],
     note: info.note?.trim() ?? '',
     result: info.result?.trim() ?? '',
+    ...(info.sourceChangeId ? { sourceChangeId: info.sourceChangeId } : {}),
   });
   await updateDeck(repo, deck.id, { ...opts.patch, updatedAt: t });
 }
@@ -91,9 +94,11 @@ async function assertOldestPending(repo: Repository, variant: Deck, p: PendingPa
 }
 
 /** Copy a deck into a variant that remembers where it came from. Copies stay where they are. */
-export async function makeVariant(repo: Repository, parent: Deck, name: string, labels: string[] = []): Promise<Deck> {
+/** A variant of `parent`, made from its latest version or from an older one (`fromSeq`). */
+export async function makeVariant(repo: Repository, parent: Deck, name: string, labels: string[] = [], fromSeq?: number): Promise<Deck> {
   const changes = await repo.listChanges(parent.id);
-  const base = changes.at(-1);
+  const base = fromSeq === undefined ? changes.at(-1) : changes.find((c) => c.seq === fromSeq);
+  if (fromSeq !== undefined && !base) throw new Error(`${parent.name} has no change ${fromSeq}`);
   const t = now();
   const variant: Deck = {
     id: uid(),
@@ -103,18 +108,19 @@ export async function makeVariant(repo: Repository, parent: Deck, name: string, 
     labels: labels.length ? labels : undefined,
     parentDeckId: parent.id,
     parentChangeId: base?.id,
+    originChangeId: base?.id,
     createdAt: t,
     updatedAt: t,
   };
   await repo.putDeck(variant);
-  await repo.addChange({ id: uid(), deckId: variant.id, seq: 1, createdAt: t, lines: base?.lines ?? [], tags: [], note: `Made from ${parent.name}`, result: '' });
+  await repo.addChange({ id: uid(), deckId: variant.id, seq: 1, createdAt: t, lines: base?.lines ?? [], tags: [], note: `Made from ${parent.name}${fromSeq !== undefined ? `, change ${fromSeq}` : ''}`, result: '' });
   return variant;
 }
 
 export async function applyParentChange(repo: Repository, variant: Deck, parentName: string, p: PendingParentChange): Promise<void> {
   const fresh = await assertOldestPending(repo, variant, p);
   const lines = applyDiff(await latestLines(repo, fresh.id), p.diff, p.change.lines);
-  await saveChange(repo, fresh, lines, { tags: ['from parent'], note: `From ${parentName}, change ${p.change.seq}${p.change.note ? `: ${p.change.note}` : ''}` }, { patch: { parentChangeId: p.change.id } });
+  await saveChange(repo, fresh, lines, { tags: ['from parent'], note: `From ${parentName}, change ${p.change.seq}${p.change.note ? `: ${p.change.note}` : ''}`, sourceChangeId: p.change.id }, { patch: { parentChangeId: p.change.id } });
 }
 
 export async function dismissParentChange(repo: Repository, variant: Deck, p: PendingParentChange): Promise<void> {

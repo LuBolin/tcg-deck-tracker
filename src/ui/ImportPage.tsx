@@ -12,6 +12,7 @@ import { ErrorBox } from './components';
 import { useGameChoice } from './useGameChoice';
 import { plural } from './text';
 import { ListReader } from './ListReader';
+import { CardPreviewPanel } from './CardSearchBox';
 import { useTitle } from './useTitle';
 
 type Ownership = 'all' | 'none' | 'pick';
@@ -116,7 +117,10 @@ export function ImportPage() {
         <p className="muted small" style={{ margin: 0 }}>
           No list? <button type="button" className="link-button accent-link" onClick={startEmpty} disabled={!!busy}>Start an empty deck</button> and add cards by search.
         </p>
-        <ListReader key={gameId} adapter={adapter} initialText={carryText} onSwitchGame={changeGame} onChange={(r, u) => (setResolved(r), setUnresolved(u))} />
+        <div className="with-preview">
+          <ListReader key={gameId} adapter={adapter} initialText={carryText} onSwitchGame={changeGame} onChange={(r, u) => (setResolved(r), setUnresolved(u))} />
+          <CardPreviewPanel title="Deck preview" items={resolved.map((r) => ({ key: `${r.line.lineNo}|${r.line.raw}`, name: r.card?.name ?? r.line.name, qty: r.line.qty, card: r.card }))} />
+        </div>
       </div>
 
       {lines.length > 0 && (

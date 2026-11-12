@@ -180,3 +180,25 @@ describe('unlimited cards', () => {
     expect(summarize('d1', [line('energy', 4)], copies, free).extra).toEqual([]);
   });
 });
+
+describe('version graph', async () => {
+  const { deckFamily, versionGraph } = await import('./variants');
+  const deck = (id: string, parentDeckId?: string, originChangeId?: string, createdAt = '2026-01-01'): Deck => ({ id, game: 'demo', name: id, parentDeckId, originChangeId, createdAt, updatedAt: createdAt });
+  const ch = (id: string, deckId: string, seq: number, at: string, extra: Partial<Change> = {}): Change => ({ id, deckId, seq, createdAt: at, lines: [], tags: [], note: '', result: '', ...extra });
+  it('lays out lanes, rows and edges for a family', () => {
+    const decks = [deck('main'), deck('budget', 'main', 'm1', '2026-01-03'), deck('aggro', 'budget', undefined, '2026-01-05'), deck('other')];
+    const changes = new Map([
+      ['main', [ch('m1', 'main', 1, '2026-01-01'), ch('m2', 'main', 2, '2026-01-02'), ch('m3', 'main', 3, '2026-01-06')]],
+      ['budget', [ch('b1', 'budget', 1, '2026-01-03'), ch('b2', 'budget', 2, '2026-01-07', { tags: ['from parent'], sourceChangeId: 'm3' })]],
+      ['aggro', [ch('a1', 'aggro', 1, '2026-01-05')]],
+    ]);
+    const family = deckFamily(decks, 'aggro');
+    expect(family.map((d) => d.id)).toEqual(['main', 'budget', 'aggro']);
+    const g = versionGraph(family, changes);
+    expect(g.nodes.map((n) => `${n.change.id}@${n.lane}`)).toEqual(['m1@0', 'm2@0', 'b1@1', 'a1@2', 'm3@0', 'b2@1']);
+    const e = (kind: string) => g.edges.filter((x) => x.kind === kind).map((x) => `${x.from.change.id}>${x.to.change.id}`);
+    expect(e('variant')).toEqual(['m1>b1', 'b1>a1']); // budget from its stored origin (m1, not the later m2); aggro by time
+    expect(e('applied')).toEqual(['m3>b2']);
+    expect(e('next')).toEqual(['m1>m2', 'm2>m3', 'b1>b2']);
+  });
+});

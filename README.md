@@ -10,12 +10,16 @@ Also included:
 
 | Area | Features |
 | --- | --- |
+| Versions | Version graph of a deck and all its variants (one lane per deck, curves where variants were made and changes were taken from the parent), make a variant from any older version |
 | Decks | "When to play this" note (also asked when making a variant), card filter (missing / not in deck), custom reason tags, log a match result (W-L record per deck and variant), compare any two decks, compare an old version with now, restore an old version, filter history by tag, update from a newer pasted list, duplicate as an independent copy |
 | Cards | Images (hover, image grid, card dialog), market prices (deck value, cost to complete), "also played in" other decks |
 | Rules | Deck size, copy limits, banlists, format legality, Commander singleton and color identity, Pokémon ACE SPEC/Radiant limits and at least one Basic, Lorcana two-ink limit, One Piece Leader colors |
 | Stats | Category and subtype makeup, cost curve with average, opening-hand odds (single cards or any of several) |
+| Collection | Card-image grid with binder −/+, owned count and a mark per rarity owned; every printing of a card with per-print counts; type and role filters; renamable roles |
 | Physical cards | Gather panel to rebuild a deck from the binder and other decks (with undo), "I got N copies", collection with "needed by", missing filter, sorting and a card dialog |
 | Import / export | Pasted lists, collection CSV import and export (ManaBox, Moxfield, Dragon Shield, TCGplayer columns), Limitless deck URLs, game auto-detect, progress for long lists, `.ydk` export and download, list with change notes |
+| Players | Sign in with an email link or Google, public profile handle, follow players, public decks, Activity feed with a badge for new changes |
+| Adding cards | Type-ahead card search with image preview on hover; image side panel while importing a deck or adding to the binder |
 | Sharing | Share links that carry the deck and its reasons inside the URL (no server; readers see what they are missing and can save a copy), want-lists and selling lists for community chats |
 | Appearance | Light, dark or match the system |
 | Help | In-app Help page explaining card statuses, variants, want-lists, sharing and shortcuts |
@@ -68,7 +72,7 @@ Every push to `main` runs `.github/workflows/deploy.yml`: tests, build, then Git
 
 ## Supabase
 
-Signed-out users keep data in the browser. Signed-in users (email link) store it in Supabase through `src/data/supabaseRepository.ts`; `src/app/repo.ts` picks the storage before the first render. Settings → Account can copy the browser's data into the account.
+Signed-out users keep data in the browser. Signed-in users (email link, or Google once enabled) store it in Supabase through `src/data/supabaseRepository.ts`; `src/app/repo.ts` picks the storage before the first render. Settings → Account can copy the browser's data into the account.
 
 Setup:
 
@@ -76,6 +80,7 @@ Setup:
 2. In the SQL editor, run every file in `supabase/migrations/` in order (`0001_init.sql`, `0002_import_all.sql`, …).
 3. Authentication → URL Configuration: Site URL `https://lubolin.github.io/tcg-deck-tracker/`; redirect URLs that URL plus `http://localhost:5173/`.
 4. Supabase's built-in email sender is rate-limited and meant for testing; set up custom SMTP before inviting other players.
+5. Google sign-in (optional): in Google Cloud Console create an OAuth client (type Web application) with the authorized redirect URI `https://<project>.supabase.co/auth/v1/callback`, then paste its client ID and secret into Supabase → Authentication → Providers → Google and turn it on. The app shows "Continue with Google" as soon as the provider is enabled.
 
 Field map for `SupabaseRepository` (camelCase in the app, snake_case in SQL):
 
@@ -86,11 +91,13 @@ Field map for `SupabaseRepository` (camelCase in the app, snake_case in SQL):
 | `CopyRow` | `copies` | write only through `adjust_copies(p_game, p_deltas)`, which is all-or-nothing |
 | `Card` | `cards` | shared cache; `set` → `set_code`, `imageUrl` → `image_url`, `maxCopies` → `max_copies`, `limitGroup` → `limit_group`, `fetchedAt` → `updated_at` |
 | `Repository.importAll` | `import_all(p_backup)` | replaces the user's data in one transaction |
+| `PrintRow` | `prints` | printing labels of owned copies |
+| `Repository.getPrefs/setPrefs` | `user_prefs` | one JSON row per player |
+| `Social` (`src/data/social.ts`) | `profiles`, `follows`, `activity_feed()` | public handles, follows, feed of followed players' public decks |
 | `Repository.deleteDeck` | `decks` delete | the `decks_copies_to_binder` trigger moves the deck's copies to the binder |
 
 ## Next steps
 
-1. **Supabase**: write `SupabaseRepository` (field map above), add sign-in, switch `src/app/repo.ts`. Then public deck pages can use `is_public` instead of share links.
-2. **A small server function** (for example a Supabase Edge Function) unlocks sources that block browser requests: Star Wars: Unlimited (swu-db, no CORS), Moxfield and Archidekt deck URLs, Digimon (digimoncard.io).
-3. **Dev tooling**: vitest's remaining audit advisory needs a major upgrade (vitest 5); it affects only the test runner, not the app.
-4. **Offline**: the service worker in `public/sw.js` is untested in a real browser (the desktop app's preview refuses service workers); check it in Chrome after a production build.
+1. **A small server function** (for example a Supabase Edge Function) unlocks sources that block browser requests: Star Wars: Unlimited (swu-db, no CORS), Moxfield and Archidekt deck URLs, Digimon (digimoncard.io).
+2. **Dev tooling**: vitest's remaining audit advisory needs a major upgrade (vitest 5); it affects only the test runner, not the app.
+3. **Offline**: the service worker in `public/sw.js` is untested in a real browser (the desktop app's preview refuses service workers); check it in Chrome after a production build.

@@ -1,13 +1,13 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Card, Change, CopyDelta, CopyRow, Deck, DeckLine, GameId, PrintRow } from '../domain/types';
-import type { Backup, Repository } from './repository';
+import type { Backup, Prefs, Repository } from './repository';
 
 /** Rows as Postgres stores them (supabase/migrations/0001_init.sql). */
 interface DeckRow {
-  id: string; game: string; name: string; format: string | null; purpose: string | null; labels: string[] | null; locked: boolean | null;
-  parent_deck_id: string | null; parent_change_id: string | null; created_at: string; updated_at: string;
+  id: string; game: string; name: string; format: string | null; purpose: string | null; labels: string[] | null; locked: boolean | null; is_public: boolean | null;
+  parent_deck_id: string | null; parent_change_id: string | null; origin_change_id: string | null; created_at: string; updated_at: string;
 }
-interface ChangeRow { id: string; deck_id: string; seq: number; created_at: string; lines: DeckLine[]; tags: string[]; note: string; result: string }
+interface ChangeRow { id: string; deck_id: string; seq: number; created_at: string; lines: DeckLine[]; tags: string[]; note: string; result: string; source_change_id?: string | null }
 interface CopyDbRow { game: string; card_id: string; location: string; qty: number }
 interface PrintDbRow { game: string; card_id: string; print_id: string; qty: number; rarity: string | null; set_code: string | null; number: string | null; image_url: string | null }
 const toPrint = (r: PrintDbRow): PrintRow => ({
@@ -24,11 +24,12 @@ const num = (v: number | string | null) => (v === null ? undefined : Number(v));
 
 const toDeck = (r: DeckRow): Deck => ({
   id: r.id, game: r.game, name: r.name, format: opt(r.format), purpose: opt(r.purpose),
-  labels: r.labels?.length ? r.labels : undefined, locked: r.locked || undefined,
-  parentDeckId: opt(r.parent_deck_id), parentChangeId: opt(r.parent_change_id), createdAt: r.created_at, updatedAt: r.updated_at,
+  labels: r.labels?.length ? r.labels : undefined, locked: r.locked || undefined, isPublic: r.is_public || undefined,
+  parentDeckId: opt(r.parent_deck_id), parentChangeId: opt(r.parent_change_id), originChangeId: opt(r.origin_change_id), createdAt: r.created_at, updatedAt: r.updated_at,
 });
 const toChange = (r: ChangeRow): Change => ({
   id: r.id, deckId: r.deck_id, seq: r.seq, createdAt: r.created_at, lines: r.lines, tags: r.tags, note: r.note, result: r.result,
+  ...(r.source_change_id ? { sourceChangeId: r.source_change_id } : {}),
 });
 const toCard = (r: CardRow): Card => ({
   game: r.game, id: r.id, name: r.name, category: opt(r.category), subtype: opt(r.subtype), set: opt(r.set_code),
@@ -86,8 +87,8 @@ export class SupabaseRepository implements Repository {
   }
   async putDeck(d: Deck) {
     await must(this.db.from('decks').upsert({
-      id: d.id, game: d.game, name: d.name, format: d.format ?? null, purpose: d.purpose ?? null, labels: d.labels ?? [], locked: d.locked ?? false,
-      parent_deck_id: d.parentDeckId ?? null, parent_change_id: d.parentChangeId ?? null, created_at: d.createdAt, updated_at: d.updatedAt,
+      id: d.id, game: d.game, name: d.name, format: d.format ?? null, purpose: d.purpose ?? null, labels: d.labels ?? [], locked: d.locked ?? false, is_public: d.isPublic ?? false,
+      parent_deck_id: d.parentDeckId ?? null, parent_change_id: d.parentChangeId ?? null, origin_change_id: d.originChangeId ?? null, created_at: d.createdAt, updated_at: d.updatedAt,
     }));
   }
   /** The decks_copies_to_binder trigger moves the deck's copies to the binder in the same statement. */
@@ -102,6 +103,7 @@ export class SupabaseRepository implements Repository {
   async addChange(c: Change) {
     const { error } = await this.db.from('changes').insert({
       id: c.id, deck_id: c.deckId, seq: c.seq, created_at: c.createdAt, lines: c.lines, tags: c.tags, note: c.note, result: c.result,
+      source_change_id: c.sourceChangeId ?? null,
     });
     if (error?.code === '23505') throw new Error(`Change ${c.seq} already exists for this deck`);
     if (error) throw new Error(error.message);
@@ -149,6 +151,14 @@ export class SupabaseRepository implements Repository {
   }
   async putCards(cards: Card[]) {
     for (const part of chunks(cards, 500)) await must(this.db.from('cards').upsert(part.map(fromCard)));
+  }
+
+  async getPrefs(): Promise<Prefs> {
+    const row = await must<{ prefs: Prefs } | null>(this.db.from('user_prefs').select('prefs').eq('owner_id', this.userId).maybeSingle());
+    return row?.prefs ?? {};
+  }
+  async setPrefs(prefs: Prefs) {
+    await must(this.db.from('user_prefs').upsert({ owner_id: this.userId, prefs }));
   }
 
   async exportAll(): Promise<Backup> {

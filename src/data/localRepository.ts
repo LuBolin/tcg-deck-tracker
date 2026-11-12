@@ -1,10 +1,11 @@
 import { applyDeltas, emptyDeckDeltas } from '../domain/collection';
 import type { Card, Change, CopyRow, Deck, PrintRow } from '../domain/types';
-import type { Backup, Repository } from './repository';
+import type { Backup, Prefs, Repository } from './repository';
 
 const DB_NAME = 'tcg-deck-tracker';
 const STORE = 'kv';
 const KEY = 'state';
+const PREFS = 'prefs';
 
 function openDb(name: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -159,6 +160,15 @@ export class LocalRepository implements Repository {
       const incoming = new Map(cards.map((c) => [k(c), clone(c)]));
       s.cards = [...s.cards.filter((c) => !incoming.has(k(c))), ...incoming.values()];
     });
+  }
+
+  async getPrefs() {
+    const db = await this.open();
+    return (await idb<Prefs | undefined>(db, 'readonly', (s) => s.get(PREFS))) ?? {};
+  }
+  async setPrefs(prefs: Prefs) {
+    const db = await this.open();
+    await idb(db, 'readwrite', (s) => s.put(clone(prefs), PREFS));
   }
 
   async exportAll() {

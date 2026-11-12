@@ -27,6 +27,19 @@ export function HelpPage() {
           <p className="small muted">Write results as wins-losses (for example 3-1) and each deck keeps a record.</p>
         </section>
         <section className="panel stack">
+          <h2>Version graph</h2>
+          <p>A deck's <strong>Variants</strong> tab draws every saved change of the deck and its variants: one colored line per deck, a dot per change. A curve shows where a variant was made; a dashed curve shows a change it took from its parent.</p>
+          <p className="small muted">In History, <strong>Make a variant from this version</strong> starts a variant from any older version, not just the latest.</p>
+        </section>
+        <section className="panel stack">
+          <h2>Printings and rarities</h2>
+          <p>Cards with the same game text are one entry, whatever the art. In the Collection, click a card to see every printing and count which of your copies are which; the marks on each card (★, ◆, ●) show the rarities you own.</p>
+        </section>
+        <section className="panel stack">
+          <h2>Following players</h2>
+          <p>Signed in, pick a handle in Settings. Make a deck public from its <strong>More</strong> menu; players who follow you see its changes on their <Link to="/activity">Activity</Link> page, with a badge for anything new.</p>
+        </section>
+        <section className="panel stack">
           <h2>Want-lists and selling</h2>
           <p>A <strong>want-list</strong> is a plain-text message of your missing cards and offers. A <strong>selling list</strong> lists your spare binder cards. Post either in any chat.</p>
           <p>Paste a list from someone else into <Link to="/want">Check a list</Link> to see which of your spares they want, or which of your decks need what they sell.</p>

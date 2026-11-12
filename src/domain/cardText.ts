@@ -133,5 +133,6 @@ export function typeOptions(cards: Card[], categoryOrder: string[]): string[] {
   return [...new Set([...main, ...groups].filter((t): t is string => !!t))];
 }
 
-/** Common rules plus a game's own, for `cardTags`. */
-export const tagRulesFor = (game?: { tagRules?: TagRule[] }) => [...COMMON_TAG_RULES, ...(game?.tagRules ?? [])];
+/** Common rules plus a game's own, for `cardTags`. `names` renames tags ("draw" → "card draw"). */
+export const tagRulesFor = (game?: { tagRules?: TagRule[] }, names: Record<string, string> = {}): TagRule[] =>
+  [...COMMON_TAG_RULES, ...(game?.tagRules ?? [])].map((r) => (names[r.tag]?.trim() ? { ...r, tag: names[r.tag].trim() } : r));

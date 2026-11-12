@@ -1,3 +1,4 @@
+import { rolesFor } from '../../app/prefs';
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { latestLines } from '../../app/actions';
@@ -8,7 +9,7 @@ import type { SlotStatus } from '../../domain/status';
 import { BINDER, type Card, type DeckLine } from '../../domain/types';
 import type { GameAdapter } from '../../games/types';
 import { LabelChip, SlotChips } from '../components';
-import { cardTags, tagRulesFor } from '../../domain/cardText';
+import { cardTags } from '../../domain/cardText';
 
 interface Props {
   adapter: GameAdapter;
@@ -91,8 +92,8 @@ export function CardDialog({ adapter, deckId, line, card, status, deckName, isLo
               ))}
             </div>
           )}
-          {card && cardTags(card, tagRulesFor(adapter)).length > 0 && (
-            <div className="row labels">{cardTags(card, tagRulesFor(adapter)).map((t) => <LabelChip key={t} name={t} />)}</div>
+          {card && cardTags(card, rolesFor(adapter)).length > 0 && (
+            <div className="row labels">{cardTags(card, rolesFor(adapter)).map((t) => <LabelChip key={t} name={t} />)}</div>
           )}
           {card?.text && <p className="card-text small">{card.text}</p>}
           {adapter.id === 'pokemon' && <p className="muted small" style={{ margin: 0 }}>Legality shown is for this printing; a legal reprint with the same text also counts.</p>}

@@ -7,11 +7,15 @@ import { ErrorBox } from './components';
 import { markBackedUp } from './backup';
 import { applyTheme, readTheme, type Theme } from './theme';
 import { setTracksUnlimited, tracksUnlimited } from '../app/supply';
+import { roleNames, setRoleName } from '../app/prefs';
+import { COMMON_TAG_RULES } from '../domain/cardText';
 import { useTitle } from './useTitle';
 
 export function SettingsPage() {
   const [message, setMessage] = useState<string>();
   useTitle("Settings");
+  // Links like /settings#roles jump to their panel.
+  useEffect(() => { if (location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView(); }, []);
   const place = currentAccount() ? 'your account' : 'this browser';
   const [error, setError] = useState<string>();
 
@@ -113,6 +117,7 @@ export function SettingsPage() {
         </div>
       </div>
       <UnlimitedCards />
+      <RoleNames />
       <div className="panel stack">
         <h2>Card data</h2>
         <p className="muted">Prices, legality and banlists change. Each deck refreshes its own cards when they are a week old; this refreshes every deck now.</p>
@@ -162,6 +167,43 @@ function UnlimitedCards() {
         </div>
       ))}
       <p className="small muted" style={{ margin: 0 }}>Saved in this browser.</p>
+    </div>
+  );
+}
+
+/** Rename the role tags the app works out from card text ("draw" → "card draw"). Empty = the original name. */
+function RoleNames() {
+  const tags = [...new Set([...COMMON_TAG_RULES, ...games().flatMap((g) => g.tagRules ?? [])].map((r) => r.tag))].sort();
+  const [names, setNames] = useState<Record<string, string>>(roleNames);
+  const [saved, setSaved] = useState<string>();
+  const [error, setError] = useState<string>();
+  const save = async (tag: string, value: string) => {
+    if ((roleNames()[tag] ?? '') === value.trim()) return;
+    try {
+      await setRoleName(tag, value);
+      setNames(roleNames());
+      setSaved(tag);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+  return (
+    <div className="panel stack" id="roles">
+      <h2>Role names</h2>
+      <p className="muted small" style={{ margin: 0 }}>Roles are worked out from each card's text. Give any of them your own name; leave a box empty to keep the original.</p>
+      <div className="role-names">
+        {tags.map((t) => (
+          <label key={t} className="row">
+            <span className="role-original">{t}</span>
+            <input value={names[t] ?? ''} placeholder={t} aria-label={`Name for the ${t} role`}
+              onChange={(e) => setNames({ ...names, [t]: e.target.value })}
+              onBlur={(e) => save(t, e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
+            {saved === t && <span className="small muted" role="status">Saved</span>}
+          </label>
+        ))}
+      </div>
+      <ErrorBox error={error} />
     </div>
   );
 }

@@ -1,9 +1,21 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { unreadActivity } from '../app/activity';
 import { Link, NavLink, Outlet, useLocation } from 'react-router';
 import { APP_NAME, currentAccount, supabase } from '../app/repo';
 
 export function Shell() {
   const { pathname } = useLocation();
+  // New activity from followed players: checked on load, every few minutes, and cleared by opening Activity.
+  const [unread, setUnread] = useState(0);
+  useEffect(() => {
+    if (!currentAccount()) return;
+    const check = () => unreadActivity().then(setUnread, () => {});
+    check();
+    const t = setInterval(check, 3 * 60_000);
+    const seen = () => setUnread(0);
+    window.addEventListener('activity-seen', seen);
+    return () => { clearInterval(t); window.removeEventListener('activity-seen', seen); };
+  }, []);
   // Deck pages and import belong to the Decks section.
   const inDecks = pathname === '/' || pathname.startsWith('/decks') || pathname.startsWith('/import');
 
@@ -26,6 +38,11 @@ export function Shell() {
           <NavLink to="/" className={() => (inDecks ? 'active' : '')} aria-current={inDecks ? 'page' : undefined}>Decks</NavLink>
           <NavLink to="/collection">Collection</NavLink>
           <NavLink to="/want">Want-lists</NavLink>
+          {currentAccount() && (
+            <NavLink to="/activity" aria-label={unread ? `Activity, ${unread} new` : 'Activity'}>
+              Activity{unread > 0 && <span className="nav-badge" aria-hidden="true">{unread > 9 ? '9+' : unread}</span>}
+            </NavLink>
+          )}
           <NavLink to="/settings">Settings</NavLink>
           <NavLink to="/help">Help</NavLink>
           {supabase && !currentAccount() && <Link to="/settings" className="nav-cta">Sign in</Link>}

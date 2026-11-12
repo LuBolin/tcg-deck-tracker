@@ -1,4 +1,5 @@
-import { cardTags, tagRulesFor } from '../../domain/cardText';
+import { rolesFor } from '../../app/prefs';
+import { cardTags } from '../../domain/cardText';
 import { LabelChip } from '../components';
 import { useState } from 'react';
 import { cardTotals, countCards } from '../../domain/decklist';
@@ -39,7 +40,7 @@ export function DeckStats({ adapter, lines, cards, statuses }: { adapter: GameAd
     .sort((a, b) => b.card!.price! * b.missing - a.card!.price! * a.missing)
     .slice(0, 5);
 
-  const rules = tagRulesFor(adapter);
+  const rules = rolesFor(adapter);
   const roleCount = new Map<string, number>();
   for (const l of lines.filter((x) => x.section === adapter.sections[0].id)) {
     const c = cards.get(l.cardId);

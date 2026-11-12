@@ -35,12 +35,13 @@ export function SlotChips({ status, deckName, isLocked = () => false }: { status
 }
 
 /** One-choice filter as a row of chips (card types, roles). Click the active chip again to clear it. */
-export function FilterChips({ label, options, value, onChange, style }: { label: string; options: string[]; value?: string; onChange: (v?: string) => void; style?: CSSProperties }) {
+export function FilterChips({ label, options, value, onChange, style, extra }: { label: string; options: string[]; value?: string; onChange: (v?: string) => void; style?: CSSProperties; extra?: ReactNode }) {
   if (options.length === 0) return null;
   return (
     <div className="row labels" role="group" aria-label={`Filter by ${label.toLowerCase()}`} style={style}>
       <span className="muted small">{label}:</span>
       {options.map((t) => <LabelChip key={t} name={t} active={value === t} onClick={() => onChange(value === t ? undefined : t)} />)}
+      {extra}
     </div>
   );
 }

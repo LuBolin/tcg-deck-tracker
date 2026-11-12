@@ -175,3 +175,12 @@ describe('printing labels', () => {
     expect(await repo.listPrints('pokemon')).toHaveLength(1);
   });
 });
+
+describe('prefs', () => {
+  it('are stored apart from decks and survive a restore', async () => {
+    const repo = new LocalRepository('test-prefs');
+    await repo.setPrefs({ 'role-names': { draw: 'card draw' } });
+    await repo.importAll({ version: 1, decks: [], changes: [], copies: [], cards: [] });
+    expect(await new LocalRepository('test-prefs').getPrefs()).toEqual({ 'role-names': { draw: 'card draw' } });
+  });
+});

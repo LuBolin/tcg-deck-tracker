@@ -2,6 +2,8 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { LocalRepository } from '../data/localRepository';
 import type { Repository } from '../data/repository';
 import { SupabaseRepository } from '../data/supabaseRepository';
+import { loadPrefs } from './prefs';
+import { Social } from '../data/social';
 
 export const APP_NAME = 'TCG Deck Tracker';
 
@@ -16,6 +18,19 @@ export const localRepo = new LocalRepository();
 
 let current: Repository = localRepo;
 let account: { id: string; email: string } | undefined;
+let social: Social | undefined;
+
+/** Sign-in providers switched on in the Supabase project (Authentication → Providers), for example "google". */
+export async function enabledProviders(): Promise<string[]> {
+  if (!url || !key) return [];
+  const res = await fetch(`${url}/auth/v1/settings`, { headers: { apikey: key } });
+  if (!res.ok) return [];
+  const body = (await res.json()) as { external?: Record<string, boolean> };
+  return Object.entries(body.external ?? {}).filter(([, on]) => on).map(([p]) => p);
+}
+
+/** Following and public decks; undefined until signed in. */
+export const currentSocial = () => social;
 
 /** The signed-in account, or undefined when data is stored in this browser. */
 export const currentAccount = () => account;
@@ -25,12 +40,18 @@ export const currentAccount = () => account;
  * shortcut: no offline mode for accounts; without a session (or a network to refresh it) the app shows browser data.
  */
 export async function initRepo() {
+  await pickStorage();
+  await loadPrefs(current);
+}
+
+async function pickStorage() {
   if (!supabase) return;
   const { data } = await supabase.auth.getSession();
   const user = data.session?.user;
   if (user) {
     current = new SupabaseRepository(supabase, user.id);
     account = { id: user.id, email: user.email ?? '' };
+    social = new Social(supabase, user.id);
   }
   // Signing in or out (here or in another tab) switches the storage; a reload keeps every page consistent.
   supabase.auth.onAuthStateChange((event, session) => {

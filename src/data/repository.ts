@@ -27,10 +27,16 @@ export interface Repository {
   getCards(game: GameId, ids: string[]): Promise<Card[]>;
   putCards(cards: Card[]): Promise<void>;
 
+  /** Settings that follow the player (role names, basic-card tracking). Not part of backups. */
+  getPrefs(): Promise<Prefs>;
+  setPrefs(prefs: Prefs): Promise<void>;
+
   exportAll(): Promise<Backup>;
   /** Replaces all data. */
   importAll(backup: Backup): Promise<void>;
 }
+
+export type Prefs = Record<string, unknown>;
 
 export interface Backup {
   version: 1;

@@ -1,3 +1,4 @@
+import { rolesFor } from '../app/prefs';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { addCopies, latestLines } from '../app/actions';
@@ -10,16 +11,18 @@ import { formatUsd } from '../domain/insights';
 import { slotStatuses } from '../domain/status';
 import { collectionToCsv } from '../domain/csv';
 import { downloadText } from './download';
-import { BINDER, type PrintRow } from '../domain/types';
+import { BINDER, type Card, type PrintRow } from '../domain/types';
 import type { Printing } from '../games/types';
 import { CollectionGrid } from './CollectionGrid';
 import { games } from '../games';
 import type { ResolvedLine } from '../games/types';
 import { Empty, ErrorBox, FilterChips, LabelChip, Loading } from './components';
-import { cardTags, cardTypes, searchCards, tagRulesFor, typeOptions } from '../domain/cardText';
+import { cardTags, cardTypes, searchCards, typeOptions } from '../domain/cardText';
 import { useGameChoice } from './useGameChoice';
 import { plural } from './text';
 import { ListReader } from './ListReader';
+import { CardPreviewPanel, CardSearchBox } from './CardSearchBox';
+import { stamp } from '../app/cardData';
 import { CollectionCardDialog } from './CollectionCardDialog';
 import { useTitle } from './useTitle';
 
@@ -48,10 +51,11 @@ export function CollectionPage() {
   const [filter, setFilter] = useState('');
   const [role, setRole] = useState<string>();
   const [type, setType] = useState<string>();
-  const rules = useMemo(() => tagRulesFor(adapter), [adapter]);
+  const rules = useMemo(() => rolesFor(adapter), [adapter]);
   // Role tags per card, computed once per load.
   const tagsById = useMemo(() => new Map((data?.cards ?? []).map((c) => [c.id, cardTags(c, rules)])), [data, rules]);
   const [adding, setAdding] = useState<ResolvedLine[]>([]);
+  const [picked, setPicked] = useState<{ card: Card; qty: number }[]>([]);
   const [unresolved, setUnresolved] = useState(0);
   const [readerKey, setReaderKey] = useState(0);
   const [actionError, setActionError] = useState<string>();
@@ -108,11 +112,20 @@ export function CollectionPage() {
     }
   };
 
+  const pickCard = (card: Card) => {
+    const same = (p: { card: Card }) => p.card.id === card.id && p.card.set === card.set && p.card.number === card.number;
+    setPicked((ps) => (ps.some(same) ? ps.map((p) => (same(p) ? { ...p, qty: p.qty + 1 } : p)) : [...ps, { card, qty: 1 }]));
+  };
+
   const addToBinder = () =>
     run(async () => {
-      const deltas = [...cardTotals(toDeckLines(adding))].map(([cardId, qty]) => ({ cardId, location: BINDER, delta: qty }));
+      const lines = [...toDeckLines(adding), ...picked.map((p) => ({ cardId: p.card.id, name: p.card.name, qty: p.qty, section: 'main' }))];
+      // Cards picked from search are cached like read ones, so the collection can show them.
+      if (picked.length) await repo.putCards(stamp(picked.map((p) => p.card)));
+      const deltas = [...cardTotals(lines)].map(([cardId, qty]) => ({ cardId, location: BINDER, delta: qty }));
       await repo.adjustCopies(gameId, deltas);
       setAdding([]);
+      setPicked([]);
       setReaderKey((k) => k + 1);
     });
 
@@ -144,16 +157,41 @@ export function CollectionPage() {
 
       <details className="panel">
         <summary><strong>Add cards to the binder</strong></summary>
-        <div style={{ marginTop: '0.75rem' }}>
-          <ListReader key={`${gameId}-${readerKey}`} adapter={adapter} label="Card list or collection CSV" onChange={(r, u) => (setAdding(r), setUnresolved(u))} />
-          {adding.some((r) => r.card) && (
-            <div className="row" style={{ marginTop: '0.5rem' }}>
-              <button type="button" className="primary" onClick={addToBinder} disabled={unresolved > 0}>
-                Add {plural(toDeckLines(adding).reduce((n, l) => n + l.qty, 0), 'copy', 'copies')} to the binder
-              </button>
-              {unresolved > 0 && <span className="muted small">Fix or remove the problem lines first.</span>}
-            </div>
-          )}
+        <div className="with-preview" style={{ marginTop: '0.75rem' }}>
+          <div className="stack">
+            <CardSearchBox adapter={adapter} onPick={pickCard} />
+            {picked.length > 0 && (
+              <ul className="picked-list">
+                {picked.map((p, i) => (
+                  <li key={`${p.card.id}|${p.card.set}|${p.card.number}`} className="row">
+                    <span className="cs-name">{p.card.name}</span>
+                    <span className="muted small">{[p.card.set, p.card.number].filter(Boolean).join(' ')}</span>
+                    <span className="row" style={{ marginLeft: 'auto' }}>
+                      <button type="button" className="small" aria-label={`One fewer ${p.card.name}`} onClick={() => setPicked(picked.flatMap((x, j) => (j !== i ? [x] : x.qty > 1 ? [{ ...x, qty: x.qty - 1 }] : [])))}>−</button>
+                      <strong>{p.qty}</strong>
+                      <button type="button" className="small" aria-label={`One more ${p.card.name}`} onClick={() => setPicked(picked.map((x, j) => (j === i ? { ...x, qty: x.qty + 1 } : x)))}>+</button>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <details>
+              <summary className="small">Or paste a list or collection CSV</summary>
+              <ListReader key={`${gameId}-${readerKey}`} adapter={adapter} label="Card list or collection CSV" onChange={(r, u) => (setAdding(r), setUnresolved(u))} />
+            </details>
+            {(picked.length > 0 || adding.some((r) => r.card)) && (
+              <div className="row">
+                <button type="button" className="primary" onClick={addToBinder} disabled={unresolved > 0}>
+                  Add {plural(toDeckLines(adding).reduce((n, l) => n + l.qty, 0) + picked.reduce((n, p) => n + p.qty, 0), 'copy', 'copies')} to the binder
+                </button>
+                {unresolved > 0 && <span className="muted small">Fix or remove the problem lines first.</span>}
+              </div>
+            )}
+          </div>
+          <CardPreviewPanel title="Adding" items={[
+            ...picked.map((p) => ({ key: `pick|${p.card.id}|${p.card.set}|${p.card.number}`, name: p.card.name, qty: p.qty, card: p.card })),
+            ...adding.map((r) => ({ key: `${r.line.lineNo}|${r.line.raw}`, name: r.card?.name ?? r.line.name, qty: r.line.qty, card: r.card })),
+          ]} />
         </div>
       </details>
 
@@ -188,7 +226,7 @@ export function CollectionPage() {
             </span>
           </div>
           <FilterChips label="Type" options={types} value={type} onChange={setType} style={{ marginBottom: '0.5rem' }} />
-          <FilterChips label="Roles" options={roles} value={role} onChange={setRole} style={{ marginBottom: '0.5rem' }} />
+          <FilterChips label="Roles" options={roles} value={role} onChange={setRole} style={{ marginBottom: '0.5rem' }} extra={<Link className="small" to="/settings#roles">Rename</Link>} />
           {view === 'images' && (rows.length === 0
             ? <p className="muted small">{show === 'missing' ? 'Your decks are not missing any cards.' : 'No cards match.'}</p>
             : <CollectionGrid adapter={adapter} rows={rows} prints={data.prints} onOpen={setOpenCard}

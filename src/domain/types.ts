@@ -1,0 +1,104 @@
+/** Game-neutral domain types. Nothing here knows about a specific TCG. */
+
+export type GameId = string;
+
+/** Where a physical copy is. Either the binder or a deck id. */
+export type Location = string;
+export const BINDER: Location = 'binder';
+
+/**
+ * A card as the game plays it. Printings that are the same in play share one id
+ * (the game adapter decides what "same in play" means).
+ */
+export interface Card {
+  game: GameId;
+  id: string;
+  name: string;
+  /** Grouping label, for example "Trainer" or "Creature". */
+  category?: string;
+  /** Finer type inside the category, for example "Basic" (Pokémon stage) or "Supporter". */
+  subtype?: string;
+  /** Default printing, used for display and export. */
+  set?: string;
+  number?: string;
+  imageUrl?: string;
+  /** Market price in USD for the default printing, when the card source has one. */
+  price?: number;
+  /** Format names (lowercase) the card is legal in. Undefined = not known. */
+  legal?: string[];
+  /** Mana value or similar cost, for curve stats. */
+  cost?: number;
+  /** Per-card copy limit from a banlist (0 = forbidden). Undefined = the format's normal limit. */
+  maxCopies?: number;
+  /** Color identity letters (MTG: W U B R G), for Commander deck checks. */
+  identity?: string[];
+  /** A deck-wide limit group the card belongs to, for example "ACE SPEC" (Pokémon: 1 per deck). */
+  limitGroup?: string;
+  /** When the app last fetched this card's data (ISO time); prices and legality go stale. */
+  fetchedAt?: string;
+}
+
+/** One line of a deck list. */
+export interface DeckLine {
+  cardId: string;
+  /** Cached so a list renders without card data. */
+  name: string;
+  qty: number;
+  /** Section id from the game adapter, for example "main" or "sideboard". */
+  section: string;
+  set?: string;
+  number?: string;
+  category?: string;
+}
+
+export interface Deck {
+  id: string;
+  game: GameId;
+  name: string;
+  format?: string;
+  /** When to play this deck, for example "Use against aggro-heavy locals". */
+  purpose?: string;
+  /** The deck this variant was made from. */
+  parentDeckId?: string;
+  /** The parent's change this variant is based on (moves forward when parent changes are applied or dismissed). */
+  parentChangeId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Every save of a deck. Holds a full snapshot of the list. */
+export interface Change {
+  id: string;
+  deckId: string;
+  /** 1-based, per deck. */
+  seq: number;
+  createdAt: string;
+  lines: DeckLine[];
+  tags: string[];
+  note: string;
+  /** Optional match result, for example "3-1 vs Deck X". */
+  result: string;
+}
+
+/** Count of physical copies of one card at one location. */
+export interface CopyRow {
+  game: GameId;
+  cardId: string;
+  location: Location;
+  qty: number;
+}
+
+export interface CopyDelta {
+  cardId: string;
+  location: Location;
+  delta: number;
+}
+
+export const REASON_TAGS = [
+  'vs aggro',
+  'vs control',
+  'budget',
+  'meta shift',
+  'testing',
+  'new set',
+] as const;

@@ -1,0 +1,41 @@
+import { useEffect } from 'react';
+import { Link, NavLink, Outlet, useLocation } from 'react-router';
+import { APP_NAME } from '../app/repo';
+
+export function Shell() {
+  const { pathname } = useLocation();
+  // Deck pages and import belong to the Decks section.
+  const inDecks = pathname === '/' || pathname.startsWith('/decks') || pathname.startsWith('/import');
+
+  // "/" jumps to the page's search box (Find a deck, Find a card), unless the user is typing.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || t.closest('input, textarea, select, [contenteditable]')) return;
+      const box = document.querySelector<HTMLInputElement>('main input[aria-label^="Find"]');
+      if (box) { e.preventDefault(); box.focus(); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  return (
+    <>
+      <header className="topbar">
+        <Link to="/" className="brand"><span className="brand-mark" aria-hidden />{APP_NAME}</Link>
+        <nav className="nav" aria-label="Main">
+          <NavLink to="/" className={() => (inDecks ? 'active' : '')} aria-current={inDecks ? 'page' : undefined}>Decks</NavLink>
+          <NavLink to="/collection">Collection</NavLink>
+          <NavLink to="/want">Want-lists</NavLink>
+          <NavLink to="/settings">Settings</NavLink>
+          <NavLink to="/help">Help</NavLink>
+        </nav>
+      </header>
+      <main className="main">
+        <Outlet />
+      </main>
+      <footer className="footer small muted">
+        Your decks are saved in this browser only. <Link to="/settings">Back up or restore</Link> · Card data from community services (see Settings). Press / to search.
+      </footer>
+    </>
+  );
+}

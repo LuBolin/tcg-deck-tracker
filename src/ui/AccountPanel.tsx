@@ -33,7 +33,7 @@ export function AccountPanel() {
         options: { emailRedirectTo: `${location.origin}${import.meta.env.BASE_URL}` },
       });
       if (error) throw new Error(error.message);
-      return `Check ${email.trim()} for a sign-in link. Open it in this browser or any other.`;
+      return `Check ${email.trim()} and open the link to finish. It signs you in, or creates your account the first time.`;
     });
 
   const copyLocal = () =>
@@ -49,8 +49,8 @@ export function AccountPanel() {
     });
 
   return (
-    <div className="panel stack">
-      <h2>Account</h2>
+    <div className="panel stack" id="account">
+      <h2>{account ? 'Account' : 'Sign in or create an account'}</h2>
       {account ? (
         <>
           <p className="muted" style={{ margin: 0 }}>
@@ -63,10 +63,13 @@ export function AccountPanel() {
         </>
       ) : (
         <form className="stack" onSubmit={(e) => { e.preventDefault(); void sendLink(); }}>
-          <p className="muted" style={{ margin: 0 }}>Sign in to save your decks to an account and use them on every device. No password: we email you a link.</p>
+          <p className="muted" style={{ margin: 0 }}>
+            Save your decks and collection to an account and use them on any device. Enter your email and we send you a link.
+            New here? The same link creates your account. No password needed.
+          </p>
           <div className="row">
             <input type="email" required autoComplete="email" placeholder="you@example.com" aria-label="Email address" value={email} onChange={(e) => setEmail(e.target.value)} />
-            <button type="submit" className="primary" disabled={busy || !email.trim()}>{busy ? 'Sending…' : 'Email me a sign-in link'}</button>
+            <button type="submit" className="primary" disabled={busy || !email.trim()}>{busy ? 'Sending…' : 'Continue with email'}</button>
           </div>
         </form>
       )}

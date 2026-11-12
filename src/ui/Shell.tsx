@@ -28,6 +28,7 @@ export function Shell() {
           <NavLink to="/want">Want-lists</NavLink>
           <NavLink to="/settings">Settings</NavLink>
           <NavLink to="/help">Help</NavLink>
+          {supabase && !currentAccount() && <Link to="/settings" className="nav-cta">Sign in</Link>}
         </nav>
       </header>
       <main className="main">

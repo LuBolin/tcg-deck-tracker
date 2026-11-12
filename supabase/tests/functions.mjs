@@ -12,7 +12,7 @@ create function auth.uid() returns uuid language sql stable as $$ select nullif(
 insert into auth.users values ('00000000-0000-0000-0000-000000000001');
 select set_config('test.uid', '00000000-0000-0000-0000-000000000001', false);
 `);
-await db.exec(readFileSync(process.argv[2], 'utf8'));
+for (const f of process.argv.slice(2)) await db.exec(readFileSync(f, 'utf8')); // migrations in order
 const q = async (s) => (await db.query(s)).rows;
 const deck = (await q(`insert into decks (game, name) values ('demo','Main') returning id`))[0].id;
 await q(`select adjust_copies('demo', '[{"cardId":"a","location":"binder","delta":3}]')`);

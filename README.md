@@ -66,11 +66,16 @@ Every push to `main` runs `.github/workflows/deploy.yml`: tests, build, then Git
 2. Add it to the list in `src/games/index.ts`.
 3. Add tests with a fake fetch, like `src/games/games.test.ts`.
 
-## Connect Supabase (next step)
+## Supabase
 
-1. Create a Supabase project and run `supabase/migrations/0001_init.sql`.
-2. Add `@supabase/supabase-js` and write `SupabaseRepository` implementing `src/data/repository.ts` (`adjustCopies` calls the `adjust_copies` function).
-3. Add sign-in, then switch the repository in `src/app/repo.ts`.
+Signed-out users keep data in the browser. Signed-in users (email link) store it in Supabase through `src/data/supabaseRepository.ts`; `src/app/repo.ts` picks the storage before the first render. Settings → Account can copy the browser's data into the account.
+
+Setup:
+
+1. Put the project URL and the **publishable** key in `.env` (both are public; never the secret key).
+2. In the SQL editor, run `supabase/migrations/0001_init.sql`, then `0002_import_all.sql`.
+3. Authentication → URL Configuration: Site URL `https://lubolin.github.io/tcg-deck-tracker/`; redirect URLs that URL plus `http://localhost:5173/`.
+4. Supabase's built-in email sender is rate-limited and meant for testing; set up custom SMTP before inviting other players.
 
 Field map for `SupabaseRepository` (camelCase in the app, snake_case in SQL):
 
@@ -80,6 +85,7 @@ Field map for `SupabaseRepository` (camelCase in the app, snake_case in SQL):
 | `Change` | `changes` | `lines` is JSON (`DeckLine[]`); `(deck_id, seq)` is unique, so a lost race on the next `seq` fails instead of overwriting |
 | `CopyRow` | `copies` | write only through `adjust_copies(p_game, p_deltas)`, which is all-or-nothing |
 | `Card` | `cards` | shared cache; `set` → `set_code`, `imageUrl` → `image_url`, `maxCopies` → `max_copies`, `limitGroup` → `limit_group`, `fetchedAt` → `updated_at` |
+| `Repository.importAll` | `import_all(p_backup)` | replaces the user's data in one transaction |
 | `Repository.deleteDeck` | `decks` delete | the `decks_copies_to_binder` trigger moves the deck's copies to the binder |
 
 ## Next steps

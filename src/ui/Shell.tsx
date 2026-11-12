@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Link, NavLink, Outlet, useLocation } from 'react-router';
-import { APP_NAME } from '../app/repo';
+import { APP_NAME, currentAccount, supabase } from '../app/repo';
 
 export function Shell() {
   const { pathname } = useLocation();
@@ -34,7 +34,9 @@ export function Shell() {
         <Outlet />
       </main>
       <footer className="footer small muted">
-        Your decks are saved in this browser only. <Link to="/settings">Back up or restore</Link> · Card data from community services (see Settings). Press / to search.
+        {currentAccount()
+          ? <>Saved to your account ({currentAccount()!.email}). <Link to="/settings">Account and backups</Link></>
+          : <>Your decks are saved in this browser only. <Link to="/settings">{supabase ? 'Sign in or back up' : 'Back up or restore'}</Link></>} · Card data from community services (see Settings). Press / to search.
       </footer>
     </>
   );

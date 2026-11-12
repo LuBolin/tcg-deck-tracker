@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createBrowserRouter, RouterProvider } from 'react-router';
+import { initRepo } from './app/repo';
 import { CollectionPage } from './ui/CollectionPage';
 import { DeckPage } from './ui/deck/DeckPage';
 import { ToastProvider } from './ui/toast';
@@ -32,12 +33,15 @@ const router = createBrowserRouter([
   },
 ], { basename: import.meta.env.BASE_URL.replace(/\/$/, '') || '/' });
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <ToastProvider>
-      <RouterProvider router={router} />
-    </ToastProvider>
-  </StrictMode>,
+// Storage (account or this browser) is picked before any page loads data.
+initRepo().catch(() => {}).finally(() =>
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <ToastProvider>
+        <RouterProvider router={router} />
+      </ToastProvider>
+    </StrictMode>,
+  ),
 );
 
 // Offline app shell, production builds only (in dev it would cache modules mid-edit).

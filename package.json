@@ -9,9 +9,10 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:sql": "node supabase/tests/functions.mjs supabase/migrations/0001_init.sql && node supabase/tests/rls.mjs supabase/migrations/0001_init.sql"
+    "test:sql": "node supabase/tests/functions.mjs supabase/migrations/0001_init.sql supabase/migrations/0002_import_all.sql && node supabase/tests/rls.mjs supabase/migrations/0001_init.sql supabase/migrations/0002_import_all.sql"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.119.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-router": "^7.6.2"

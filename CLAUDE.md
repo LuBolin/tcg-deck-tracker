@@ -5,7 +5,7 @@ Design doc: "TCG Deck Tracker — Design Document" (Claude Docs). Core values: p
 ## Architecture
 
 - `src/domain/` stays game-neutral and pure (no fetch, no storage, no React). Game rules live only in `src/games/<game>/`.
-- All storage goes through `Repository` (`src/data/repository.ts`). The UI never touches IndexedDB or Supabase directly. Pick the backend only in `src/app/repo.ts`.
+- All storage goes through `Repository` (`src/data/repository.ts`). The UI never touches IndexedDB or Supabase directly. Pick the backend only in `src/app/repo.ts`: Supabase when signed in, else IndexedDB (`repo` forwards to the chosen one; sign-in or sign-out reloads the page).
 - Multi-step operations live in `src/app/actions.ts`, not in pages.
 - The UI uses no version-control words: deck, variant, change, reason, "made from". Never branch, commit, merge or fork.
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { latestLines, refreshCardData } from '../app/actions';
-import { repo } from '../app/repo';
+import { currentAccount, repo } from '../app/repo';
+import { AccountPanel } from './AccountPanel';
 import { games } from '../games';
 import { ErrorBox } from './components';
 import { markBackedUp } from './backup';
@@ -10,6 +11,7 @@ import { useTitle } from './useTitle';
 export function SettingsPage() {
   const [message, setMessage] = useState<string>();
   useTitle("Settings");
+  const place = currentAccount() ? 'your account' : 'this browser';
   const [error, setError] = useState<string>();
 
   const exportData = async () => {
@@ -26,7 +28,7 @@ export function SettingsPage() {
   const importData = async (file: File) => {
     setError(undefined);
     setMessage(undefined);
-    if (!window.confirm('Replace ALL data in this browser with the backup? Decks, history and collection here are overwritten.')) return;
+    if (!window.confirm(`Replace ALL data in ${place} with the backup? Decks, history and collection there are overwritten.`)) return;
     try {
       await repo.importAll(JSON.parse(await file.text()));
       setMessage('Backup restored.');
@@ -67,7 +69,7 @@ export function SettingsPage() {
     setError(undefined);
     setMessage(undefined);
     // Cannot be undone, so ask for a typed confirmation rather than one click.
-    const typed = window.prompt('This deletes ALL decks, history and collection data in this browser and cannot be undone. Type DELETE to confirm.');
+    const typed = window.prompt(`This deletes ALL decks, history and collection data in ${place} and cannot be undone. Type DELETE to confirm.`);
     if (typed?.trim() !== 'DELETE') return;
     try {
       await repo.importAll({ version: 1, decks: [], changes: [], copies: [], cards: [] });
@@ -80,11 +82,13 @@ export function SettingsPage() {
   return (
     <>
       <h1>Settings</h1>
+      <AccountPanel />
       <div className="panel stack">
         <h2>Your data</h2>
         <p className="muted">
-          For now, all data is stored in this browser only. Clearing site data deletes it. Download a backup to keep it safe or to
-          move it to another browser.
+          {currentAccount()
+            ? 'Your data is stored in your account. Download a backup to keep your own copy.'
+            : 'Your data is stored in this browser only. Clearing site data deletes it. Download a backup to keep it safe, or sign in to save it to an account.'}
         </p>
         {usage && <p className="small muted" style={{ margin: 0 }}>{usage}</p>}
         <div className="row">
@@ -116,7 +120,7 @@ export function SettingsPage() {
       </div>
       <div className="panel stack">
         <h2>Start over</h2>
-        <p className="muted">Deletes every deck, change, copy and cached card in this browser. Download a backup first if you might want them back.</p>
+        <p className="muted">Deletes every deck, change and copy in {place}. Download a backup first if you might want them back.</p>
         <div className="row">
           <button type="button" className="danger" onClick={clearAll}>Delete all data…</button>
         </div>

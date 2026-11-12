@@ -40,7 +40,7 @@ export function HelpPage() {
         </section>
         <section className="panel stack">
           <h2>Your data</h2>
-          <p>Everything is saved in this browser only, for now. Download a backup from <Link to="/settings">Settings</Link>. Press <kbd>/</kbd> to jump to the search box on the decks and collection pages.</p>
+          <p>Until you sign in, everything is saved in this browser only. Sign in from <Link to="/settings">Settings</Link> to save to an account and use it on any device; you can copy this browser's decks into it. Backups download from Settings too. Press <kbd>/</kbd> to jump to the search box on the decks and collection pages.</p>
         </section>
       </div>
     </>

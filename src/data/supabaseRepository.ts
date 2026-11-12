@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Card, Change, CopyDelta, CopyRow, Deck, DeckLine, GameId } from '../domain/types';
+import type { Card, Change, CopyDelta, CopyRow, Deck, DeckLine, GameId, PrintRow } from '../domain/types';
 import type { Backup, Repository } from './repository';
 
 /** Rows as Postgres stores them (supabase/migrations/0001_init.sql). */
@@ -9,6 +9,10 @@ interface DeckRow {
 }
 interface ChangeRow { id: string; deck_id: string; seq: number; created_at: string; lines: DeckLine[]; tags: string[]; note: string; result: string }
 interface CopyDbRow { game: string; card_id: string; location: string; qty: number }
+interface PrintDbRow { game: string; card_id: string; print_id: string; qty: number; rarity: string | null; set_code: string | null; number: string | null; image_url: string | null }
+const toPrint = (r: PrintDbRow): PrintRow => ({
+  game: r.game, cardId: r.card_id, printId: r.print_id, qty: r.qty, rarity: opt(r.rarity), set: opt(r.set_code), number: opt(r.number), imageUrl: opt(r.image_url),
+});
 interface CardRow {
   game: string; id: string; name: string; category: string | null; subtype: string | null; set_code: string | null;
   number: string | null; image_url: string | null; price: number | string | null; legal: string[] | null; cost: number | string | null;
@@ -116,6 +120,26 @@ export class SupabaseRepository implements Repository {
     await must(this.db.rpc('adjust_copies', { p_game: game, p_deltas: deltas }));
   }
 
+  /** Printing labels of one game, or of every game. */
+  async listPrints(game?: GameId) {
+    const rows = await all<PrintDbRow>((a, b) => {
+      const q = this.db.from('prints').select('game, card_id, print_id, qty, rarity, set_code, number, image_url').eq('owner_id', this.userId);
+      return (game ? q.eq('game', game) : q).order('game').order('card_id').order('print_id').range(a, b);
+    });
+    return rows.map(toPrint);
+  }
+  async setPrint(p: PrintRow) {
+    if (!Number.isInteger(p.qty) || p.qty < 0) throw new Error('A printing count must be a whole number, 0 or more');
+    const key = { owner_id: this.userId, game: p.game, card_id: p.cardId, print_id: p.printId };
+    if (p.qty === 0) {
+      await must(this.db.from('prints').delete().match(key));
+      return;
+    }
+    await must(this.db.from('prints').upsert({
+      ...key, qty: p.qty, rarity: p.rarity ?? null, set_code: p.set ?? null, number: p.number ?? null, image_url: p.imageUrl ?? null,
+    }));
+  }
+
   async getCards(game: GameId, ids: string[]) {
     const out: Card[] = [];
     for (const part of chunks([...new Set(ids)], 100)) {
@@ -144,11 +168,11 @@ export class SupabaseRepository implements Repository {
     for (const c of copies) want(c.game, c.cardId);
     const cards: Card[] = [];
     for (const [game, set] of ids) cards.push(...(await this.getCards(game, [...set])));
-    return { version: 1, decks, changes, copies, cards };
+    return { version: 1, decks, changes, copies, cards, prints: await this.listPrints() };
   }
   /** Replaces the account's data in one transaction (supabase/migrations/0002_import_all.sql). */
   async importAll(backup: Backup) {
-    const lists = [backup?.decks, backup?.changes, backup?.copies, backup?.cards];
+    const lists = [backup?.decks, backup?.changes, backup?.copies, backup?.cards, backup?.prints ?? []];
     if (backup?.version !== 1 || !lists.every(Array.isArray)) throw new Error('This file is not a TCG Deck Tracker backup');
     await must(this.db.rpc('import_all', { p_backup: backup }));
   }

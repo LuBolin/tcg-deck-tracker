@@ -309,3 +309,39 @@ button.label-chip.on { background: hsl(var(--label-hue) 65% 45%); color: #fff; }
 /* A parent shown only because a variant matches the filter. */
 .deck-link.context { opacity: 0.55; }
 .card-text { white-space: pre-line; margin: 0; padding: 0.5rem 0.65rem; border-radius: 8px; background: var(--surface-2); max-height: 14rem; overflow: auto; }
+
+/* Collection image grid: −/+ for the binder, owned count in a hexagon, rarity marks (★ ◆ ●). */
+.coll-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.coll-tile .art-button { border: none; padding: 0; width: 100%; height: 100%; display: block; cursor: pointer; background: none; }
+.coll-tile .art-button:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+.coll-bar {
+  position: absolute; left: 6px; right: 6px; bottom: 6px; display: flex; align-items: center; gap: 0.3rem;
+  padding: 0.25rem 0.35rem; border-radius: 8px; background: rgb(15 15 20 / 0.72); backdrop-filter: blur(2px);
+}
+.coll-bar .step {
+  width: 1.7rem; height: 1.7rem; padding: 0; border-radius: 6px; border: none; font-weight: 800; font-size: 1.05rem; line-height: 1;
+  background: var(--accent); color: #fff; cursor: pointer;
+}
+.coll-bar .step:disabled { opacity: 0.35; cursor: not-allowed; }
+.count-hex {
+  min-width: 1.9rem; height: 1.9rem; display: inline-grid; place-items: center; padding: 0 0.3rem; font-weight: 800; color: #fff;
+  background: #dc2626; clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+}
+.rarity { font-weight: 800; font-size: 0.95rem; line-height: 1; letter-spacing: -0.05em; text-shadow: 0 1px 2px rgb(0 0 0 / 0.6); color: #f4f4f5; }
+.rarity.gold { color: #f59e0b; }
+.rarity.silver { color: #cbd5e1; }
+.rarity.pink { color: #ec4899; font-size: 0.7rem; letter-spacing: 0; }
+.coll-tile figcaption { flex-direction: row; align-items: center; justify-content: space-between; gap: 0.3rem; }
+.coll-tile .tile-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Printings in the collection card dialog. */
+.print-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 0.6rem; }
+.print-tile { display: flex; flex-direction: column; gap: 0.25rem; border-radius: 8px; padding: 0.3rem; border: 1px solid transparent; }
+.print-tile.owned { border-color: var(--accent); background: var(--accent-soft); }
+.print-tile .art-button { border: none; padding: 0; background: var(--surface-2); border-radius: 6px; overflow: hidden; aspect-ratio: 63 / 88; cursor: zoom-in; }
+.print-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.print-tile .rarity { text-shadow: none; color: var(--text); }
+.print-tile .rarity.gold { color: #d97706; }
+.print-tile .rarity.silver { color: #64748b; }
+.print-meta { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: baseline; }
+.print-step { justify-content: center; gap: 0.4rem; }

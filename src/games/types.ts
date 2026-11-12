@@ -44,6 +44,10 @@ export interface GameAdapter {
    * missing unless the player turns on tracking for them in Settings.
    */
   unlimited?: { label: string; test(cardId: string): boolean };
+  /** Optional: every printing of this card (same card id), most common first, for alternate-art counts. */
+  printingsOf?(card: Card): Promise<Printing[]>;
+  /** Optional: a short symbol for a rarity, like the one printed on the card. */
+  raritySymbol?(rarity: string): RaritySymbol;
   /** Optional: the most common (lowest rarity) printing of each card, by card id; cards without one are left out. */
   commonPrinting?(cards: Card[]): Promise<Map<string, Card>>;
   /** Optional role tags for this game, added to the common ones (draw, removal, aoe…). */
@@ -53,6 +57,21 @@ export interface GameAdapter {
    * Without it, `Card.legal` is taken as is.
    */
   checkLegality?(cards: Card[], format: string): Promise<Map<string, boolean>>;
+}
+
+export interface Printing {
+  printId: string;
+  set?: string;
+  number?: string;
+  rarity?: string;
+  imageUrl?: string;
+  price?: number;
+}
+
+/** "●" common, "★★" double rare…; `tone` colors it (gold for illustration rares). */
+export interface RaritySymbol {
+  symbol: string;
+  tone: 'plain' | 'silver' | 'gold' | 'pink';
 }
 
 export interface ResolvedLine {

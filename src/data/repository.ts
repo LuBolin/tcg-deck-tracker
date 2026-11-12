@@ -1,4 +1,4 @@
-import type { Card, Change, CopyDelta, CopyRow, Deck, GameId } from '../domain/types';
+import type { Card, Change, CopyDelta, CopyRow, Deck, GameId, PrintRow } from '../domain/types';
 
 /**
  * Storage boundary. The app talks only to this interface.
@@ -19,6 +19,11 @@ export interface Repository {
   /** Applied all-or-nothing. Rejects if any location would go below zero. */
   adjustCopies(game: GameId, deltas: CopyDelta[]): Promise<void>;
 
+  /** Printing labels of owned copies. */
+  listPrints(game: GameId): Promise<PrintRow[]>;
+  /** Set how many owned copies are this printing; qty 0 removes the label. */
+  setPrint(row: PrintRow): Promise<void>;
+
   getCards(game: GameId, ids: string[]): Promise<Card[]>;
   putCards(cards: Card[]): Promise<void>;
 
@@ -33,4 +38,6 @@ export interface Backup {
   changes: Change[];
   copies: CopyRow[];
   cards: Card[];
+  /** Missing in backups made before printings were tracked. */
+  prints?: PrintRow[];
 }

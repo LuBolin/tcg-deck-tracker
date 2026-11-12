@@ -94,6 +94,22 @@ export interface CopyRow {
   qty: number;
 }
 
+/**
+ * Which printing some of the player's copies of a card are (a special art, a rarity). Labels only:
+ * where copies are, and every deck check, uses CopyRow totals. The labels of a card add up to at most its copies.
+ */
+export interface PrintRow {
+  game: GameId;
+  cardId: string;
+  /** The card source's id for this printing, for example TCGdex "sv10-186". */
+  printId: string;
+  qty: number;
+  rarity?: string;
+  set?: string;
+  number?: string;
+  imageUrl?: string;
+}
+
 export interface CopyDelta {
   cardId: string;
   location: Location;

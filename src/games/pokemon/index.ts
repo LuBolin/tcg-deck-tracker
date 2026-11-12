@@ -1,7 +1,7 @@
 import { splitTrailingSetNumber, type ListFormat, type ParsedLine } from '../../domain/listParse';
 import type { Card, DeckLine } from '../../domain/types';
 import { fetchJson, pool } from '../common';
-import type { GameAdapter, ResolvedLine } from '../types';
+import type { GameAdapter, Printing, RaritySymbol, ResolvedLine } from '../types';
 
 /**
  * Pokemon TCG. Card data from TCGdex (https://tcgdex.dev), which needs no key and allows
@@ -87,6 +87,24 @@ export const isBasicEnergyId = (id: string) => id.startsWith('energy:') && isBas
 
 /** Lower = more common. Unknown rarities sort with the rare cards, after the common ones. */
 const RARITY_ORDER = ['none', 'common', 'uncommon', 'rare', 'rare holo', 'promo', 'double rare', 'ace spec rare', 'radiant rare', 'ultra rare', 'shiny rare', 'illustration rare', 'shiny ultra rare', 'special illustration rare', 'hyper rare', 'secret rare'];
+const RARITY_SYMBOL: Record<string, RaritySymbol> = {
+  common: { symbol: '●', tone: 'plain' },
+  uncommon: { symbol: '◆', tone: 'plain' },
+  rare: { symbol: '★', tone: 'plain' },
+  'rare holo': { symbol: '★', tone: 'plain' },
+  'double rare': { symbol: '★★', tone: 'plain' },
+  'ultra rare': { symbol: '★★', tone: 'silver' },
+  'illustration rare': { symbol: '★', tone: 'gold' },
+  'special illustration rare': { symbol: '★★', tone: 'gold' },
+  'hyper rare': { symbol: '★★★', tone: 'gold' },
+  'secret rare': { symbol: '★★★', tone: 'gold' },
+  'ace spec rare': { symbol: 'ACE', tone: 'pink' },
+  'shiny rare': { symbol: '★', tone: 'silver' },
+  'shiny ultra rare': { symbol: '★★', tone: 'silver' },
+  promo: { symbol: 'P', tone: 'plain' },
+};
+export const raritySymbol = (rarity: string): RaritySymbol => RARITY_SYMBOL[rarity.toLowerCase()] ?? { symbol: '★', tone: 'plain' };
+
 export function rarityRank(rarity?: string): number {
   const i = RARITY_ORDER.indexOf((rarity ?? 'none').toLowerCase());
   return i === -1 ? RARITY_ORDER.indexOf('double rare') : i;
@@ -255,6 +273,18 @@ export function createPokemonAdapter(fetchFn: typeof fetchJson = fetchJson): Gam
     resolve: (lines) => pool(lines, 6, resolveOne),
 
     unlimited: { label: 'basic Energy', test: isBasicEnergyId },
+    raritySymbol,
+
+    /** Every printing with the same text (so the same card id), most common first, then newest. */
+    async printingsOf(card) {
+      const same = (await printings(card.name, 40)).filter((c) => functionalId(c) === card.id);
+      const rows = await pool(same, 6, async (c): Promise<Printing> => {
+        const code = (await getSetById(c.set.id).catch(() => undefined))?.abbreviation?.official;
+        const num = String(Number(c.localId)) === 'NaN' ? c.localId : String(Number(c.localId));
+        return { printId: c.id, set: code ?? c.set.name, number: num, rarity: c.rarity, imageUrl: c.image ? `${c.image}/low.webp` : undefined, price: marketPrice(c) };
+      });
+      return rows.sort((a, b) => rarityRank(a.rarity) - rarityRank(b.rarity));
+    },
 
     /** Lowest rarity printing with the same text; ties go to Standard-legal, then the newest. */
     async commonPrinting(cards) {

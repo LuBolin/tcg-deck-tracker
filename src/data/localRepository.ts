@@ -1,5 +1,5 @@
 import { applyDeltas, emptyDeckDeltas } from '../domain/collection';
-import type { Card, Change, CopyRow, Deck } from '../domain/types';
+import type { Card, Change, CopyRow, Deck, PrintRow } from '../domain/types';
 import type { Backup, Repository } from './repository';
 
 const DB_NAME = 'tcg-deck-tracker';
@@ -24,7 +24,7 @@ function idb<T>(db: IDBDatabase, mode: IDBTransactionMode, run: (s: IDBObjectSto
   });
 }
 
-const empty = (): Backup => ({ version: 1, decks: [], changes: [], copies: [], cards: [] });
+const empty = (): Backup => ({ version: 1, decks: [], changes: [], copies: [], cards: [], prints: [] });
 const clone = <T>(v: T): T => structuredClone(v);
 
 /**
@@ -138,6 +138,17 @@ export class LocalRepository implements Repository {
     });
   }
 
+  async listPrints(game: string) {
+    return clone(((await this.load()).prints ?? []).filter((p) => p.game === game));
+  }
+  setPrint(row: PrintRow) {
+    if (!Number.isInteger(row.qty) || row.qty < 0) return Promise.reject(new Error('A printing count must be a whole number, 0 or more'));
+    return this.write((s) => {
+      const same = (p: PrintRow) => p.game === row.game && p.cardId === row.cardId && p.printId === row.printId;
+      s.prints = [...(s.prints ?? []).filter((p) => !same(p)), ...(row.qty > 0 ? [clone(row)] : [])];
+    });
+  }
+
   async getCards(game: string, ids: string[]) {
     const want = new Set(ids);
     return clone((await this.load()).cards.filter((c) => c.game === game && want.has(c.id)));
@@ -154,7 +165,7 @@ export class LocalRepository implements Repository {
     return clone(await this.load());
   }
   importAll(backup: Backup) {
-    const lists = [backup?.decks, backup?.changes, backup?.copies, backup?.cards];
+    const lists = [backup?.decks, backup?.changes, backup?.copies, backup?.cards, backup?.prints ?? []];
     if (backup?.version !== 1 || !lists.every(Array.isArray)) {
       return Promise.reject(new Error('This file is not a TCG Deck Tracker backup'));
     }

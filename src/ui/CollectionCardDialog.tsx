@@ -1,8 +1,9 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { formatUsd } from '../domain/insights';
-import { BINDER, type Card } from '../domain/types';
-import type { GameAdapter } from '../games/types';
+import { BINDER, type Card, type PrintRow } from '../domain/types';
+import type { GameAdapter, Printing } from '../games/types';
+import { RarityMark } from './CollectionGrid';
 
 interface Props {
   adapter: GameAdapter;
@@ -12,11 +13,15 @@ interface Props {
   needs: { deckId: string; short: number; missing: number }[];
   deckName: (id: string) => string;
   onBinder: (delta: number) => void;
+  /** Printing labels of this card's copies. */
+  prints: PrintRow[];
+  /** Set a printing's count; `addCopy` first adds a new copy to the binder (every owned copy was already labeled). */
+  onSetPrint: (printing: Printing, qty: number, addCopy: boolean) => void;
   onClose: () => void;
 }
 
 /** One card in the collection: where every copy is, which decks want it, and binder +/−. */
-export function CollectionCardDialog({ adapter, name, card, locs, needs, deckName, onBinder, onClose }: Props) {
+export function CollectionCardDialog({ adapter, name, card, locs, needs, deckName, onBinder, prints, onSetPrint, onClose }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const binder = locs.find((l) => l.location === BINDER)?.qty ?? 0;
   const total = locs.reduce((n, l) => n + l.qty, 0);
@@ -24,6 +29,24 @@ export function CollectionCardDialog({ adapter, name, card, locs, needs, deckNam
   useEffect(() => {
     if (ref.current && !ref.current.open) ref.current.showModal();
   }, []);
+
+  // Every printing of this card (alternate arts), fetched once when the dialog opens.
+  const [printings, setPrintings] = useState<Printing[]>();
+  const [printError, setPrintError] = useState<string>();
+  const [shown, setShown] = useState<string>(); // image of the printing being looked at
+  useEffect(() => {
+    if (!card || !adapter.printingsOf) return;
+    let live = true;
+    adapter.printingsOf(card).then(
+      (p) => live && setPrintings(p),
+      (e: unknown) => live && setPrintError(e instanceof Error ? e.message : String(e)),
+    );
+    return () => { live = false; };
+  }, [adapter, card]);
+  const labeled = prints.reduce((n, p) => n + p.qty, 0);
+  const countOf = (printId: string) => prints.find((p) => p.printId === printId)?.qty ?? 0;
+  // Labels for printings the source no longer lists still show, so they can be cleared.
+  const extraLabels = prints.filter((p) => printings && !printings.some((x) => x.printId === p.printId));
   const close = () => {
     ref.current?.close();
     onClose();
@@ -33,7 +56,7 @@ export function CollectionCardDialog({ adapter, name, card, locs, needs, deckNam
     <dialog ref={ref} className="card-dialog" onClick={(e) => e.target === ref.current && close()} onCancel={(e) => { e.preventDefault(); close(); }} aria-labelledby="coll-card-title">
       <div className="card-dialog-body">
         <div className="card-dialog-art">
-          {card?.imageUrl ? <img src={card.imageUrl.replace('/low.webp', '/high.webp').replace('/small/', '/normal/')} alt={name} /> : <div className="no-art">{name}</div>}
+          {(shown ?? card?.imageUrl) ? <img src={(shown ?? card!.imageUrl!).replace('/low.webp', '/high.webp').replace('/small/', '/normal/')} alt={name} /> : <div className="no-art">{name}</div>}
         </div>
         <div className="stack">
           <div className="spread">
@@ -77,6 +100,42 @@ export function CollectionCardDialog({ adapter, name, card, locs, needs, deckNam
                   </li>
                 ))}
               </ul>
+            </div>
+          )}
+          {adapter.printingsOf && card && (
+            <div>
+              <h3>Printings</h3>
+              <p className="small muted" style={{ marginTop: 0 }}>
+                Which of your {total} copies are which print. − only removes the label; remove copies with the binder buttons.
+              </p>
+              {labeled > total && <p className="chip warn">{labeled} copies are labeled but you own {total}. Lower some printings.</p>}
+              {printError && <p className="small muted">Could not load printings: {printError}</p>}
+              {!printings && !printError && <p className="small muted">Loading printings…</p>}
+              {printings?.length === 0 && <p className="small muted">No other printings found.</p>}
+              <div className="print-grid">
+                {[...(printings ?? []), ...extraLabels.map((p): Printing => ({ printId: p.printId, set: p.set, number: p.number, rarity: p.rarity, imageUrl: p.imageUrl }))].map((p) => {
+                  const n = countOf(p.printId);
+                  const full = labeled >= total; // every copy labeled: + adds a new copy of this print
+                  return (
+                    <div key={p.printId} className={`print-tile ${n > 0 ? 'owned' : ''}`}>
+                      <button type="button" className="art-button" onClick={() => setShown(p.imageUrl)} aria-label={`Show ${[p.set, p.number].filter(Boolean).join(' ')}`}>
+                        {p.imageUrl ? <img src={p.imageUrl} alt="" loading="lazy" /> : <span className="no-art">{p.set} {p.number}</span>}
+                      </button>
+                      <div className="print-meta small">
+                        {p.rarity && <RarityMark adapter={adapter} rarity={p.rarity} />}
+                        <span>{[p.set, p.number].filter(Boolean).join(' ')}</span>
+                        {p.price !== undefined && <span className="muted">{formatUsd(p.price)}</span>}
+                      </div>
+                      <div className="row print-step">
+                        <button type="button" className="small" disabled={n === 0} onClick={() => onSetPrint(p, n - 1, false)} aria-label={`One fewer ${p.set} ${p.number}`}>−</button>
+                        <strong>{n}</strong>
+                        <button type="button" className="small" onClick={() => onSetPrint(p, n + 1, full)}
+                          aria-label={`One more ${p.set} ${p.number}`} title={full ? 'Adds a new copy of this print to the binder' : 'Labels one of your copies as this print'}>+</button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>

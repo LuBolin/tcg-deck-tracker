@@ -157,3 +157,21 @@ describe('taking cards out, archiving and locked decks', async () => {
     expect(st.inOtherDecks).toEqual([{ deckId: 'open', qty: 2 }, { deckId: 'locked', qty: 1 }]);
   });
 });
+
+describe('printing labels', () => {
+  it('are set, cleared, kept in backups and accepted from older backups without them', async () => {
+    const repo = new LocalRepository('test-prints');
+    const p = { game: 'pokemon', cardId: 'pokemon:crustle:x', printId: 'sv10-186', qty: 1, rarity: 'Illustration rare', set: 'DRI', number: '186' };
+    await repo.setPrint(p);
+    await repo.setPrint({ ...p, printId: 'sv10-012', qty: 2, rarity: 'Rare' });
+    await repo.setPrint({ ...p, qty: 0 });
+    expect((await repo.listPrints('pokemon')).map((r) => [r.printId, r.qty])).toEqual([['sv10-012', 2]]);
+    await expect(repo.setPrint({ ...p, qty: -1 })).rejects.toThrow();
+    const backup = await repo.exportAll();
+    expect(backup.prints).toHaveLength(1);
+    await repo.importAll({ version: 1, decks: [], changes: [], copies: [], cards: [] });
+    expect(await repo.listPrints('pokemon')).toEqual([]);
+    await repo.importAll(backup);
+    expect(await repo.listPrints('pokemon')).toHaveLength(1);
+  });
+});

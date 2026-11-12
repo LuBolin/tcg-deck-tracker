@@ -441,3 +441,25 @@ describe('pokemon common printing, unlimited Energy and text search', async () =
     expect(found.map((c) => c.number)).toEqual(['185', '269']);
   });
 });
+
+describe('pokemon printings of one card', async () => {
+  const { createPokemonAdapter, functionalId, raritySymbol } = await import('./pokemon');
+  const T = 'https://api.tcgdex.net/v2/en';
+  const crustle = (id: string, rarity: string, hp: number, attack: string) => ({
+    id, localId: id.split('-')[1], name: 'Crustle', category: 'Pokemon', hp, rarity, image: `img/${id}`, set: { id: 'sv10', name: 'Destined Rivals' },
+    attacks: [{ name: attack, damage: 120, cost: ['Grass', 'Colorless', 'Colorless'] }],
+  });
+  const cards = { 'sv10-186': crustle('sv10-186', 'Illustration rare', 150, 'Superb Scissors'), 'sv10-012': crustle('sv10-012', 'Rare', 150, 'Superb Scissors'), 'bw3-7': crustle('bw3-7', 'Uncommon', 100, 'Reckless Charge') };
+  const { fn } = fakeFetch([
+    [`${T}/cards?name=eq:Crustle`, () => Object.keys(cards).map((id) => ({ id, localId: id.split('-')[1], name: 'Crustle', image: 'x' }))],
+    ...Object.entries(cards).map(([id, c]) => [`${T}/cards/${id}`, () => c] as [string, () => unknown]),
+    [`${T}/sets/sv10`, () => ({ id: 'sv10', abbreviation: { official: 'DRI' }, cards: [] })],
+    [`${T}/sets`, () => [{ id: 'bw3' }, { id: 'sv10' }]],
+  ]);
+  it('lists only printings with the same text, most common first', async () => {
+    const id = functionalId(cards['sv10-012'] as never);
+    const list = await createPokemonAdapter(fn).printingsOf!({ game: 'pokemon', id, name: 'Crustle' });
+    expect(list.map((p) => [p.printId, p.rarity, p.set])).toEqual([['sv10-012', 'Rare', 'DRI'], ['sv10-186', 'Illustration rare', 'DRI']]);
+    expect(raritySymbol('Special illustration rare')).toEqual({ symbol: '★★', tone: 'gold' });
+  });
+});

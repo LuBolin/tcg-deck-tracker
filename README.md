@@ -73,7 +73,7 @@ Signed-out users keep data in the browser. Signed-in users (email link) store it
 Setup:
 
 1. Put the project URL and the **publishable** key in `.env` (both are public; never the secret key).
-2. In the SQL editor, run `supabase/migrations/0001_init.sql`, then `0002_import_all.sql`.
+2. In the SQL editor, run every file in `supabase/migrations/` in order (`0001_init.sql`, `0002_import_all.sql`, …).
 3. Authentication → URL Configuration: Site URL `https://lubolin.github.io/tcg-deck-tracker/`; redirect URLs that URL plus `http://localhost:5173/`.
 4. Supabase's built-in email sender is rate-limited and meant for testing; set up custom SMTP before inviting other players.
 

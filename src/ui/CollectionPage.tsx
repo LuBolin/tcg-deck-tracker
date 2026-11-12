@@ -10,7 +10,9 @@ import { formatUsd } from '../domain/insights';
 import { slotStatuses } from '../domain/status';
 import { collectionToCsv } from '../domain/csv';
 import { downloadText } from './download';
-import { BINDER } from '../domain/types';
+import { BINDER, type PrintRow } from '../domain/types';
+import type { Printing } from '../games/types';
+import { CollectionGrid } from './CollectionGrid';
 import { games } from '../games';
 import type { ResolvedLine } from '../games/types';
 import { Empty, ErrorBox, FilterChips, LabelChip, Loading } from './components';
@@ -22,7 +24,9 @@ import { CollectionCardDialog } from './CollectionCardDialog';
 import { useTitle } from './useTitle';
 
 async function load(game: string) {
-  const [copies, allDecks] = await Promise.all([repo.listCopies(game), repo.listDecks()]);
+  const [copies, allDecks, printRows] = await Promise.all([repo.listCopies(game), repo.listDecks(), repo.listPrints(game)]);
+  const prints = new Map<string, PrintRow[]>();
+  for (const p of printRows) prints.set(p.cardId, [...(prints.get(p.cardId) ?? []), p]);
   const decks = allDecks.filter((d) => d.game === game);
   // Per card: decks that are short of it (copies missing, or sitting elsewhere).
   const needs = new Map<string, { deckId: string; short: number; missing: number }[]>();
@@ -33,7 +37,7 @@ async function load(game: string) {
     }
   }
   const cards = await repo.getCards(game, [...new Set([...copies.map((c) => c.cardId), ...needs.keys()])]);
-  return { copies, decks: allDecks, cards, needs };
+  return { copies, decks: allDecks, cards, needs, prints };
 }
 
 export function CollectionPage() {
@@ -54,6 +58,13 @@ export function CollectionPage() {
   const [show, setShow] = useState<'all' | 'binder' | 'decks' | 'missing'>('all');
   const [openCard, setOpenCard] = useState<string>();
   const [sort, setSort] = useState<'name' | 'value' | 'count'>('name');
+  const [view, setView] = useState<'images' | 'list'>(() => {
+    try { return localStorage.getItem('collection-view') === 'list' ? 'list' : 'images'; } catch { return 'images'; }
+  });
+  const chooseView = (v: 'images' | 'list') => {
+    setView(v);
+    try { localStorage.setItem('collection-view', v); } catch { /* storage blocked: the choice lasts until reload */ }
+  };
 
   const rows = useMemo(() => {
     // Name, role tag or rules text ("draw a card" finds "draws 2 cards").
@@ -168,13 +179,21 @@ export function CollectionPage() {
                 <button key={v} type="button" aria-pressed={show === v} className={show === v ? 'on' : ''} onClick={() => setShow(v)}>{label}</button>
               ))}
             </div>
+            <div className="segmented" role="group" aria-label="View">
+              <button type="button" aria-pressed={view === 'images'} className={view === 'images' ? 'on' : ''} onClick={() => chooseView('images')}>Images</button>
+              <button type="button" aria-pressed={view === 'list'} className={view === 'list' ? 'on' : ''} onClick={() => chooseView('list')}>List</button>
+            </div>
             <span className="muted small">
               {plural(total, 'copy', 'copies')}, {plural(rows.length, 'card')}{value > 0 && <> · about <strong className="text">{formatUsd(value)}</strong></>}
             </span>
           </div>
           <FilterChips label="Type" options={types} value={type} onChange={setType} style={{ marginBottom: '0.5rem' }} />
           <FilterChips label="Roles" options={roles} value={role} onChange={setRole} style={{ marginBottom: '0.5rem' }} />
-          <table className="list">
+          {view === 'images' && (rows.length === 0
+            ? <p className="muted small">{show === 'missing' ? 'Your decks are not missing any cards.' : 'No cards match.'}</p>
+            : <CollectionGrid adapter={adapter} rows={rows} prints={data.prints} onOpen={setOpenCard}
+                onBinder={(cardId, delta) => run(() => addCopies(repo, gameId, cardId, BINDER, delta))} />)}
+          {view === 'list' && <table className="list">
             <thead><tr><th>Card</th><th className="num">Owned</th><th>Where</th><th>Needed by</th><th className="num">Value</th><th className="num">Binder</th></tr></thead>
             <tbody>
               {rows.length === 0 && (
@@ -224,7 +243,7 @@ export function CollectionPage() {
                 );
               })}
             </tbody>
-          </table>
+          </table>}
         </div>
       )}
       {openCard && data && (() => {
@@ -232,6 +251,11 @@ export function CollectionPage() {
         if (!r) return null;
         return (
           <CollectionCardDialog adapter={adapter} name={r.name} card={r.card} locs={r.locs} needs={r.needs} deckName={deckName}
+            prints={data.prints.get(r.cardId) ?? []}
+            onSetPrint={(p: Printing, qty: number, addCopy: boolean) => run(async () => {
+              if (addCopy) await addCopies(repo, gameId, r.cardId, BINDER, 1);
+              await repo.setPrint({ game: gameId, cardId: r.cardId, printId: p.printId, qty, rarity: p.rarity, set: p.set, number: p.number, imageUrl: p.imageUrl });
+            })}
             onClose={() => setOpenCard(undefined)}
             onBinder={(delta) => run(() => addCopies(repo, gameId, r.cardId, BINDER, delta))} />
         );

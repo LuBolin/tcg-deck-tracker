@@ -21,6 +21,7 @@ Design doc: "TCG Deck Tracker — Design Document" (Claude Docs). Core values: p
 - Slot status is computed from the latest list and copy counts, never stored. Fill order: this deck, binder, other decks, then missing.
 - "Unlimited" cards (`adapter.unlimited`, Pokémon basic Energy) count as in the deck and never missing, unless Settings → Basic cards turns tracking on (per browser, `src/app/supply.ts`). Every `slotStatuses`/`summarize` call passes `unlimitedFor(game)`.
 - Card types for filters are `category`, `subtype` and `limitGroup` (`cardTypes` in `src/domain/cardText.ts`); role tags are for what a card does, not its type.
+- Printing labels (`PrintRow`, table `prints`) say which owned copies are which print (alternate art, rarity). They are labels only: locations and every deck check use `CopyRow` totals, and a card's labels add up to at most its copies. The Collection shows them as rarity marks; the card dialog lists every printing (`adapter.printingsOf`).
 - "Use the most common printing" on import keeps each card id and only swaps the shown printing (`adapter.commonPrinting`, lowest rarity first). Ownership never depends on the printing.
 - Copies are counted per (game, card, location); location = `binder` or a deck id. No single-copy tracking; foil, condition and language are out of scope.
 - Copy changes are all-or-nothing and refuse to go below zero (local and SQL). Deleting a deck moves its copies to the binder.

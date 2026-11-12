@@ -9,7 +9,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:sql": "node supabase/tests/functions.mjs supabase/migrations/0001_init.sql supabase/migrations/0002_import_all.sql supabase/migrations/0003_deck_labels_locked.sql && node supabase/tests/rls.mjs supabase/migrations/0001_init.sql supabase/migrations/0002_import_all.sql supabase/migrations/0003_deck_labels_locked.sql"
+    "test:sql": "node supabase/tests/functions.mjs supabase/migrations/0001_init.sql supabase/migrations/0002_import_all.sql supabase/migrations/0003_deck_labels_locked.sql supabase/migrations/0004_prints.sql && node supabase/tests/rls.mjs supabase/migrations/0001_init.sql supabase/migrations/0002_import_all.sql supabase/migrations/0003_deck_labels_locked.sql supabase/migrations/0004_prints.sql"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.119.0",

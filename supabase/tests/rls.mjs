@@ -66,5 +66,12 @@ assert.equal((await as(B, 'authenticated', `select count(*)::int n from decks wh
 await as(B, 'authenticated', `select import_all('{"version":1,"decks":[],"changes":[],"copies":[],"cards":[]}')`);
 assert.equal((await as(B, 'authenticated', `select count(*)::int n from copies`))[0].n, 0);
 assert.match(String(await as(null, 'anon', `select import_all('{}')`)), /Sign in first/);
+// Printing labels: private to their owner, restored by import_all, cleared with the rest.
+await as(B, 'authenticated', `select import_all('{"version":1,"decks":[],"changes":[],"copies":[{"game":"demo","cardId":"x","location":"binder","qty":2}],"cards":[],"prints":[{"game":"demo","cardId":"x","printId":"s-186","qty":1,"rarity":"Illustration rare"}]}')`);
+assert.deepEqual(await as(B, 'authenticated', `select print_id, qty, rarity from prints`), [{ print_id: 's-186', qty: 1, rarity: 'Illustration rare' }]);
+assert.deepEqual(await as(A, 'authenticated', `select * from prints`), [], 'A cannot see B\'s printings');
+assert.match(String(await as(A, 'authenticated', `insert into prints (owner_id, game, card_id, print_id, qty) values ('${B}', 'demo', 'x', 'p', 1)`)), /row-level security/);
+await as(B, 'authenticated', `select import_all('{"version":1,"decks":[],"changes":[],"copies":[],"cards":[]}')`);
+assert.equal((await as(B, 'authenticated', `select count(*)::int n from prints`))[0].n, 0, 'old backups without prints clear them');
 console.log('RLS checks passed');
 

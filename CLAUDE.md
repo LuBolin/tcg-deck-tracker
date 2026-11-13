@@ -1,6 +1,6 @@
 # Project rules: TCG Deck Tracker
 
-Design doc: "TCG Deck Tracker — Design Document" (Claude Docs). Core values: physical copy tracking, deck variants with reasons, missing-card status.
+Design doc: "TCG Deck Tracker — Design Document" (Claude Docs, https://claude.ai/artifact/VgeHf4LwTKwn3oFWWFRk8g). Core values: physical copy tracking, deck variants with reasons, missing-card status.
 
 ## Architecture
 
@@ -64,3 +64,39 @@ Design doc: "TCG Deck Tracker — Design Document" (Claude Docs). Core values: p
 
 - `npm run dev` (port 5173), `npm test`, `npm run build`, `npx eslint .`
 - `npm run test:sql`: checks the Supabase migration on PGlite (copy functions, constraints, triggers, account deletion) and row-level security with simulated users. Real Supabase auth and PostgREST are not covered.
+
+## Deploy and live data
+
+- Live site: https://lubolin.github.io/tcg-deck-tracker/ (GitHub Pages, `.github/workflows/deploy.yml`). Push to `main` = live. The user expects a deploy after changes. Push over ssh; `gh` is logged in.
+- Supabase project `tdsetnriauohyanfzuzt` (URL and publishable key in `.env`). Migrations 0001-0005 are applied.
+- Run each new `supabase/migrations/000N` file in the Supabase SQL editor BEFORE pushing app code that uses it. Method that worked: push the commit to a temp branch; in the dashboard SQL editor (browser pane) run `window.monaco.editor.getModels()[0].setValue(await (await fetch('https://raw.githubusercontent.com/LuBolin/tcg-deck-tracker/<sha>/supabase/migrations/<file>')).text())`, click Run, confirm the "destructive operations" warning (deletes inside `import_all`); push `main`; delete the temp branch.
+- The user's account holds real decks ("crustle 1/2", "Sample: Dragapult ex"). Never use Delete all; clean up only your own test data.
+- Never create accounts or enter secrets for the user (Google client secret, a second test account). Ask the user.
+- Supabase's built-in email sender is rate-limited; set up custom SMTP before inviting other players.
+
+## Working with the user
+
+- They often work remotely (phone) and are not watching. Keep closing messages self-contained.
+- They want things to work without manual entry; import formats come first.
+- Variants are first-class with their own labels; the original deck is only the default.
+- Card grouping follows exact game text (different Crustles stay separate).
+- Sign-in panel wording is "Sign in or create an account" (they said the old one did not look like account creation).
+
+## More decisions
+
+- Printing labels: + labels an existing copy, or adds a new binder copy when every copy is labelled; - removes only the label.
+- "Use the most common printing" on import is off by default.
+
+## Open work
+
+- Google sign-in: app side done. Blocked on the user creating a Google Cloud OAuth client (Web app, redirect URI `https://tdsetnriauohyanfzuzt.supabase.co/auth/v1/callback`) and pasting ID and secret in Supabase > Auth > Providers > Google. They have step-by-step instructions and said "do other stuff first". Check: `curl https://tdsetnriauohyanfzuzt.supabase.co/auth/v1/settings -H "apikey: <publishable key>"` shows `"google":true`.
+- Not tested live: profile, follow and public-deck writes (`saveProfile`, `follow`, `isPublic`; need a second account the user must create); Settings backup download / restore from file; "Copy this browser's data to my account" with real local data. Read paths were checked live; SQL and RLS are covered by `npm run test:sql`.
+- Offered, user has not decided: lazy-load supabase-js (bundle ~145 -> 206 KB gz); per-print basic Energy counts; per-deck print tracking (prints are collection-wide labels today); dedupe effect-search results (one card repeats per printing); email/push notifications (only the Activity badge exists).
+- Commits use the user's git identity. Their GitHub no-reply address was offered instead; no answer yet.
+
+## Tooling gotchas
+
+- The browser pane is often tiny: `resize_window` 1000x800, click by ref, verify with DOM/JS rather than screenshots.
+- Stopping `npm run dev` with TaskStop leaves vite on port 5173. Stop it by port (PowerShell `Get-NetTCPConnection -LocalPort 5173`).
+- Python heredocs in Bash break on quotes. Write edit scripts to the scratchpad and run them.
+- TCGdex can search Trainer/Energy rule text (`effect=like:`) but not attack or ability text.

@@ -16,7 +16,7 @@ import type { Printing } from '../games/types';
 import { CollectionGrid } from './CollectionGrid';
 import { games } from '../games';
 import type { ResolvedLine } from '../games/types';
-import { Empty, ErrorBox, FilterChips, LabelChip, Loading } from './components';
+import { Empty, ErrorBox, FilterChips, GameField, LabelChip, Loading } from './components';
 import { cardTags, cardTypes, searchCards, typeOptions } from '../domain/cardText';
 import { useGameChoice } from './useGameChoice';
 import { plural } from './text';
@@ -146,12 +146,7 @@ export function CollectionPage() {
     <>
       <div className="spread">
         <h1>Collection</h1>
-        <label className="field">
-          Game
-          <select value={gameId} onChange={(e) => setGameId(e.target.value)}>
-            {games().map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select>
-        </label>
+        <GameField value={gameId} onChange={(id) => setGameId(id)} />
       </div>
       <p className="muted">Every owned copy is in one place: the binder or one deck. Move copies between decks from a deck's page.</p>
 

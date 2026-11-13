@@ -50,7 +50,7 @@ export function HelpPage() {
         </section>
         <section className="panel stack">
           <h2>Importing</h2>
-          <p>Paste a list in the format your game's apps export, load a .txt, .csv or .ydk file, or paste a play.limitlesstcg.com decklist link. Lines the app cannot match go to <strong>Fix these</strong>; nothing is dropped silently.</p>
+          <p>Paste a list exported from Pokémon TCG Live or Limitless, load a .txt or .csv file, or paste a play.limitlesstcg.com decklist link. Lines the app cannot match go to <strong>Fix these</strong>; nothing is dropped silently.</p>
         </section>
         <section className="panel stack">
           <h2>Your data</h2>

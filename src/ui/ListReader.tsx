@@ -108,7 +108,7 @@ export function ListReader({
         <button type="button" className="primary" onClick={read} disabled={busy || !text.trim()}>
           {busy ? progress ?? 'Reading…' : 'Read list'}
         </button>
-        <label className="btn" title="A deck list (.txt) or a collection export (.csv) from apps such as ManaBox, Moxfield or Dragon Shield">
+        <label className="btn" title="A deck list (.txt) or a collection export (.csv) from a collection app such as Dragon Shield or TCGplayer">
           Load a file
           <input type="file" accept=".txt,.csv,.dek,text/plain,text/csv" hidden
             onChange={async (e) => { const f = e.target.files?.[0]; if (f) setText(await f.text()); e.target.value = ''; }} />

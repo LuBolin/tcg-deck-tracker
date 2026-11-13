@@ -15,7 +15,7 @@ import { moveDeltas } from '../../domain/collection';
 import type { Card, CopyDelta, DeckLine } from '../../domain/types';
 import { deckCount, describeIssue, sizeLabel, validateDeck } from '../../domain/rules';
 import { pendingParentChanges } from '../../domain/variants';
-import { getGame } from '../../games';
+import { games } from '../../games';
 import { CopyButton, DiffView, Empty, ErrorBox, FilterChips, GameBadge, LabelChip, Loading, MoreMenu } from '../components';
 import { useToast } from '../toast';
 import { CardDialog } from './CardDialog';
@@ -102,7 +102,7 @@ function DeckView({ id }: { id: string }) {
   const cards = useMemo(() => data?.cards ?? new Map<string, Card>(), [data]);
   const lockedIds = useMemo(() => new Set((data?.decks ?? []).filter((d) => d.locked).map((d) => d.id)), [data]);
   const statuses = useMemo(() => (data ? slotStatuses(data.deck.id, lines, data.copies, lockedIds, unlimitedFor(data.deck.game)) : new Map<string, SlotStatus>()), [data, lines, lockedIds]);
-  const adapter = data ? getGame(data.deck.game) : undefined;
+  const adapter = data ? games().find((g) => g.id === data.deck.game) : undefined;
   const format = data?.deck.format;
   const confirmed = useMemo(() => {
     const m = new Map<string, boolean>();
@@ -155,8 +155,9 @@ function DeckView({ id }: { id: string }) {
   }, [illegal, format]);
 
   if (error) return <ErrorBox error={error} />;
-  if (data === undefined || !adapter) return <Loading />;
+  if (data === undefined) return <Loading />;
   if (data === null) return <Empty>This deck does not exist. <Link to="/">Back to your decks</Link></Empty>;
+  if (!adapter) return <Empty>This deck is for a game the app does not show right now ({data.deck.game}). It is kept, and it is in your backups. <Link to="/">Back to your decks</Link></Empty>;
 
   const { deck, changes, copies, decks, parent, parentChanges, children, childLines, childRecords, family, familyChanges } = data;
   const record = totalRecord(changes.map((c) => c.result));

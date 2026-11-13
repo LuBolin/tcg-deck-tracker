@@ -1,6 +1,20 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { LineDiff } from '../domain/decklist';
 import type { SlotStatus } from '../domain/status';
+import { games } from '../games';
+
+/** The Game picker. Hidden while only one game is listed. */
+export function GameField({ value, onChange }: { value: string; onChange: (id: string) => void }) {
+  if (games().length < 2) return null;
+  return (
+    <label className="field">
+      Game
+      <select value={value} onChange={(e) => onChange(e.target.value)}>
+        {games().map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
+      </select>
+    </label>
+  );
+}
 
 export function ErrorBox({ error }: { error?: string }) {
   return error ? <div className="error" role="alert">{error}</div> : null;

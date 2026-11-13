@@ -1,6 +1,6 @@
 # TCG Deck Tracker
 
-A deck manager for physical trading card game players. It tracks:
+A deck manager for physical Pokémon TCG players. It tracks:
 
 - **Deck variants with reasons.** Every save is a change with a card diff, reason tags, a note and an optional match result. Variants remember the deck they were made from and can apply its later changes.
 - **Physical copies.** Every owned copy is in one place: the binder or one deck. Each card slot shows *in deck*, *in binder*, *in another deck* or *missing*.
@@ -25,7 +25,7 @@ Also included:
 | Help | In-app Help page explaining card statuses, variants, want-lists, sharing and shortcuts |
 | Safety | Two-tab-safe local storage, refresh all card data, backup/restore, backup reminder, typed confirmation before deleting everything |
 
-Games (card data, all free and keyless):
+Games (card data, all free and keyless). **The app shows Pokémon only for now.** The other adapters stay in `src/games/` with their tests; list one in `src/games/index.ts` to bring it back.
 
 | Game | Source | Same-in-play id | List formats |
 | --- | --- | --- | --- |

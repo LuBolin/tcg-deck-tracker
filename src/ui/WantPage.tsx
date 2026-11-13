@@ -12,7 +12,7 @@ import { formatUsd } from '../domain/insights';
 import { formatWantList, matchWant, parsePrice, parseWantList, tradeListKind, wantListGame, type WantItem, type WantMatch } from '../domain/wantlist';
 import { games } from '../games';
 import type { GameAdapter } from '../games/types';
-import { CopyButton, Empty, ErrorBox, Loading } from './components';
+import { CopyButton, Empty, ErrorBox, GameField, Loading } from './components';
 import { useGameChoice } from './useGameChoice';
 import { useTitle } from './useTitle';
 
@@ -121,12 +121,7 @@ function MakeWantList({ initialDeck }: { initialDeck?: string }) {
   return (
     <div className="grid2">
       <div className="panel stack">
-        <label className="field">
-          Game
-          <select value={game} onChange={(e) => (setGameId(e.target.value), setSelected([]))}>
-            {games().map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select>
-        </label>
+        <GameField value={game} onChange={(id) => (setGameId(id), setSelected([]))} />
         <fieldset style={{ border: 'none', padding: 0, margin: 0 }}>
           <legend className="muted small">Decks to buy for</legend>
           {gameDecks.length === 0 && <p className="muted small">No decks for this game yet.</p>}
@@ -227,12 +222,7 @@ function CheckWantList() {
   return (
     <div className="stack">
       <div className="panel stack">
-        <label className="field">
-          Game
-          <select value={gameId} onChange={(e) => (setGameId(e.target.value), setResult(undefined))}>
-            {games().map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select>
-        </label>
+        <GameField value={gameId} onChange={(id) => (setGameId(id), setResult(undefined))} />
         <label className="field">
           Paste a want-list or selling list
           <textarea value={text} onChange={(e) => {
@@ -319,12 +309,7 @@ function SellSpares() {
   return (
     <div className="grid2">
       <div className="panel stack">
-        <label className="field">
-          Game
-          <select value={gameId} onChange={(e) => (setGameId(e.target.value), setEdits({}))}>
-            {games().map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-          </select>
-        </label>
+        <GameField value={gameId} onChange={(id) => (setGameId(id), setEdits({}))} />
         {rows.length === 0 ? (
           <p className="muted small">No spare {adapter.name} cards: the binder is empty. Copies in decks are not offered.</p>
         ) : (

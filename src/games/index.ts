@@ -1,21 +1,14 @@
 import { demoAdapter } from './demo';
-import { mtgAdapter } from './mtg';
 import { pokemonAdapter } from './pokemon';
-import { yugiohAdapter } from './yugioh';
-import { lorcanaAdapter } from './lorcana';
-import { onePieceAdapter } from './onepiece';
 import type { GameAdapter } from './types';
 
-/** Registered games. Add a game by writing an adapter and listing it here. The offline demo game is dev-only. */
-const adapters: GameAdapter[] = [pokemonAdapter, mtgAdapter, yugiohAdapter, lorcanaAdapter, onePieceAdapter, ...(import.meta.env.DEV ? [demoAdapter] : [])];
+/**
+ * Registered games. Add a game by writing an adapter and listing it here. The offline demo game is dev-only.
+ * Pokémon only for now: the mtg, yugioh, lorcana and onepiece adapters are kept and tested, but not listed.
+ */
+const adapters: GameAdapter[] = [pokemonAdapter, ...(import.meta.env.DEV ? [demoAdapter] : [])];
 
 export const games = (): GameAdapter[] => adapters;
-
-export function getGame(id: string): GameAdapter {
-  const g = adapters.find((a) => a.id === id);
-  if (!g) throw new Error(`Unknown game: ${id}`);
-  return g;
-}
 
 /** Best guess of which game a pasted list is for, from format clues. Undefined when unsure. */
 export function detectGame(text: string): string | undefined {

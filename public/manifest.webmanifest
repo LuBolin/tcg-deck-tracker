@@ -1,7 +1,7 @@
 {
   "name": "TCG Deck Tracker",
   "short_name": "Decks",
-  "description": "Deck variants with reasons, physical copy tracking and missing cards.",
+  "description": "Pokémon TCG deck variants with reasons, physical copy tracking and missing cards.",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#f6f5f2",

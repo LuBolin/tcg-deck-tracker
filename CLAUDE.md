@@ -17,6 +17,7 @@ Design doc: "TCG Deck Tracker — Design Document" (Claude Docs, https://claude.
 
 ## Decisions (do not re-open without new evidence)
 
+- Scope (2026-11-14): Pokémon only for now. `games()` lists Pokémon (plus the dev-only demo). The MTG, Yu-Gi-Oh!, Lorcana and One Piece adapters stay in the repo with their tests but are not listed, so the build leaves them out. The Game picker (`GameField`) hides while one game is listed; decks of an unlisted game are kept, left off the Decks page, and their page says the game is not shown. Build Pokémon features first; keep `src/domain/` game-neutral so other games can return. Colors stay as they are: a red accent would clash with red "missing" chips.
 - Each change stores a full snapshot of the deck list; diffs are computed. Lists are small.
 - Slot status is computed from the latest list and copy counts, never stored. Fill order: this deck, binder, other decks, then missing.
 - "Unlimited" cards (`adapter.unlimited`, Pokémon basic Energy) count as in the deck and never missing, unless Settings → Basic cards turns tracking on (per browser, `src/app/supply.ts`). Every `slotStatuses`/`summarize` call passes `unlimitedFor(game)`.

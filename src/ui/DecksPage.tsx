@@ -199,26 +199,6 @@ const SAMPLES: Record<string, { name: string; format: string; list: string }> = 
     format: 'Expanded',
     list: '4 Dreepy TWM 128\n4 Drakloak TWM 129\n3 Dragapult ex TWM 130\n2 Budew PRE 4\n4 Arven\n4 Iono\n4 Professor\'s Research\n4 Buddy-Buddy Poffin\n4 Ultra Ball\n4 Nest Ball\n4 Rare Candy\n3 Night Stretcher\n2 Super Rod\n2 Counter Catcher\n2 Boss\'s Orders\n6 Basic {R} Energy\n4 Basic {P} Energy',
   },
-  yugioh: {
-    name: 'Sample: Blue-Eyes',
-    format: 'Advanced',
-    list: 'Main Deck\n3 Blue-Eyes White Dragon\n3 Sage with Eyes of Blue\n3 Dictator of D.\n2 Blue-Eyes Alternative White Dragon\n3 Maiden of White\n1 Dragon Spirit of White\n3 Ash Blossom & Joyous Spring\n3 The Melody of Awakening Dragon\n3 Trade-In\n3 Bingo Machine, Go!!!\n2 Return of the Dragon Lords\n3 Pot of Desires\n1 Monster Reborn\n1 Harpie\'s Feather Duster\n3 Infinite Impermanence\n3 Called by the Grave\n\nExtra Deck\n1 Blue-Eyes Twin Burst Dragon\n1 Accesscode Talker',
-  },
-  lorcana: {
-    name: 'Sample: Lorcana mix (shows rule warnings)',
-    format: 'Core',
-    list: '4 Elsa - Spirit of Winter\n4 Mickey Mouse - Brave Little Tailor\n4 Be Prepared\n4 Dinglehopper\n4 Friends on the Other Side\n4 Stitch - Rock Star\n4 Simba - Protective Cub\n4 Moana - Of Motunui\n4 Maleficent - Monstrous Dragon\n4 Hades - King of Olympus\n4 Let It Go\n4 Magic Broom - Bucket Brigade\n4 Rapunzel - Gifted with Healing\n4 Gaston - Arrogant Hunter\n4 Belle - Strange but Special',
-  },
-  onepiece: {
-    name: 'Sample: Red Zoro',
-    format: 'Standard',
-    list: '1xOP01-001\n4xOP01-004\n4xOP01-006\n4xOP01-013\n4xOP01-015\n4xOP01-016\n4xOP01-017\n4xOP01-021\n4xOP01-022\n4xOP01-024\n4xOP01-025\n4xOP01-026\n4xOP01-029\n2xOP01-030',
-  },
-  mtg: {
-    name: 'Sample: Mono-Red Burn',
-    format: 'Modern',
-    list: 'Deck\n4 Monastery Swiftspear\n4 Goblin Guide\n4 Lightning Bolt\n4 Lava Spike\n4 Rift Bolt\n4 Skewer the Critics\n4 Boros Charm\n4 Light Up the Stage\n4 Eidolon of the Great Revel\n4 Skullcrack\n2 Fireblast\n18 Mountain\n\nSideboard\n2 Smash to Smithereens',
-  },
 };
 
 function Welcome({ onCreated }: { onCreated: () => void }) {
@@ -242,7 +222,7 @@ function Welcome({ onCreated }: { onCreated: () => void }) {
   };
   return (
     <Empty>
-      <h2>Track your decks, your cards, and why you changed them</h2>
+      <h2>Track your Pokémon decks, your cards, and why you changed them</h2>
       <ol className="welcome-steps">
         <li><strong>Import</strong> a deck list you already have. Cards you do not own stay in the deck, flagged as missing.</li>
         <li><strong>Edit</strong> with a reason. Make variants for other metas or a budget build.</li>
@@ -255,7 +235,7 @@ function Welcome({ onCreated }: { onCreated: () => void }) {
       <div className="row" style={{ justifyContent: 'center' }}>
         {games().filter((g) => SAMPLES[g.id]).map((g) => (
           <button key={g.id} type="button" className="small" onClick={() => trySample(g)} disabled={!!busy}>
-            {busy === g.id ? 'Loading…' : g.name}
+            {busy === g.id ? 'Loading…' : SAMPLES[g.id].name.replace(/^Sample: /, '')}
           </button>
         ))}
       </div>

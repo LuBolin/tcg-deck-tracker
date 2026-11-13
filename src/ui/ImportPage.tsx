@@ -8,7 +8,7 @@ import { cardTotals, countCards, normalizeLines } from '../domain/decklist';
 import { formatUsd } from '../domain/insights';
 import { games } from '../games';
 import type { ResolvedLine } from '../games/types';
-import { ErrorBox } from './components';
+import { ErrorBox, GameField } from './components';
 import { useGameChoice } from './useGameChoice';
 import { plural } from './text';
 import { ListReader } from './ListReader';
@@ -97,12 +97,7 @@ export function ImportPage() {
       <h1>Import a deck</h1>
       <div className="panel stack">
         <div className="row">
-          <label className="field">
-            Game
-            <select value={gameId} onChange={(e) => changeGame(e.target.value)}>
-              {games().map((g) => <option key={g.id} value={g.id}>{g.name}</option>)}
-            </select>
-          </label>
+          <GameField value={gameId} onChange={(id) => changeGame(id)} />
           <label className="field" style={{ flex: 1, minWidth: '12rem' }}>
             Deck name
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder={suggested || 'For example: Charizard ex'} />

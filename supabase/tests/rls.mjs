@@ -87,6 +87,8 @@ assert.ok(feed.length > 0 && feed.every((r) => r.deck_name === 'A public' && r.h
 const anonFollows = await as(null, 'anon', `select * from follows`);
 assert.ok(Array.isArray(anonFollows) ? anonFollows.length === 0 : /ERROR/.test(anonFollows), 'anon cannot read follows');
 assert.equal((await as(A, 'authenticated', `select count(*)::int n from follows where followee_id = '${A}'`))[0].n, 1, 'A sees who follows A');
+assert.equal((await as(null, 'anon', `select follower_count('${A}')::int n`))[0].n, 1, 'anyone sees the follower count');
+assert.equal((await as(B, 'authenticated', `select follower_count('${B}')::int n`))[0].n, 0, 'count is per player');
 await as(A, 'authenticated', `insert into user_prefs (prefs) values ('{"role-names":{"draw":"card draw"}}')`);
 assert.deepEqual(await as(B, 'authenticated', `select * from user_prefs`), [], 'prefs are private');
 console.log('RLS checks passed');

@@ -55,10 +55,9 @@ export class Social {
     if (rows.length === 0) return [];
     return (await must<ProfileRow[]>(this.db.from('profiles').select('id, handle, display_name').in('id', rows.map((r) => r.followee_id)).order('handle'))).map(toProfile);
   }
+  /** Through an SQL function: follows are private, so counting rows would see only the viewer's own follow. */
   async followerCount(userId: string): Promise<number> {
-    const { count, error } = await this.db.from('follows').select('*', { count: 'exact', head: true }).eq('followee_id', userId);
-    if (error) throw new Error(error.message);
-    return count ?? 0;
+    return Number(await must<number>(this.db.rpc('follower_count', { p_user: userId })));
   }
   async follow(userId: string) {
     await must(this.db.from('follows').upsert({ follower_id: this.userId, followee_id: userId }));

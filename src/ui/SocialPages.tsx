@@ -110,9 +110,8 @@ export function ProfilePage() {
     if (!reader) return undefined;
     const p = await reader.profile(handle);
     if (!p) return null;
-    // Followers are visible to signed-in players only.
     const [decks, recent, followers, following] = await Promise.all([
-      reader.publicDecks(p.id), reader.recentChanges(p.id), social ? social.followerCount(p.id) : undefined, social ? social.following() : [],
+      reader.publicDecks(p.id), reader.recentChanges(p.id), reader.followerCount(p.id), social ? social.following() : [],
     ]);
     return { p, decks, recent, followers, isFollowing: following.some((f) => f.id === p.id) };
   }, [handle]);
@@ -144,7 +143,7 @@ export function ProfilePage() {
       <div className="spread">
         <div>
           <h1 style={{ marginBottom: 0 }}>{who(p)}</h1>
-          <p className="muted" style={{ marginTop: '0.2rem' }}>@{p.handle}{followers !== undefined && ` · ${followers} ${followers === 1 ? 'follower' : 'followers'}`}</p>
+          <p className="muted" style={{ marginTop: '0.2rem' }}>@{p.handle} · {followers} {followers === 1 ? 'follower' : 'followers'}</p>
         </div>
         {!social && <Link className="btn" to="/settings">Sign in to follow</Link>}
         {social && !mine && <button type="button" className={isFollowing ? '' : 'primary'} onClick={toggle} disabled={busy} aria-pressed={isFollowing}>{isFollowing ? 'Following' : 'Follow'}</button>}

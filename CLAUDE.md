@@ -69,7 +69,7 @@ Design doc: "TCG Deck Tracker — Design Document" (Claude Docs, https://claude.
 ## Deploy and live data
 
 - Live site: https://lubolin.github.io/tcg-deck-tracker/ (GitHub Pages, `.github/workflows/deploy.yml`). Push to `main` = live. The user expects a deploy after changes. Push over ssh; `gh` is logged in.
-- Supabase project `tdsetnriauohyanfzuzt` (URL and publishable key in `.env`). Migrations 0001-0007 are applied (0006 and 0007 on 2026-11-14).
+- Supabase project `tdsetnriauohyanfzuzt` (URL and publishable key in `.env`). Migrations 0001-0008 are applied (0006-0007 on 2026-11-14, 0008 on 2026-11-15).
 - Run each new `supabase/migrations/000N` file in the Supabase SQL editor BEFORE pushing app code that uses it. Method that worked: push the commit to a temp branch; in the dashboard SQL editor (browser pane) run `window.monaco.editor.getModels()[0].setValue(await (await fetch('https://raw.githubusercontent.com/LuBolin/tcg-deck-tracker/<sha>/supabase/migrations/<file>')).text())`, click Run, confirm the "destructive operations" warning (deletes inside `import_all`); push `main`; delete the temp branch.
 - The user's account holds real decks ("crustle 1/2", "Sample: Dragapult ex"). Never use Delete all; clean up only your own test data.
 - Never create accounts or enter secrets for the user (Google client secret, a second test account). Ask the user.
@@ -93,7 +93,7 @@ Design doc: "TCG Deck Tracker — Design Document" (Claude Docs, https://claude.
 - Tech options (`OPTIONS` section, Pokémon "Tech options"): ideas shown with the deck. `cardTotals` and copy limits skip them, so they need no copies, are never missing and never gathered; exports (`formatList`) and the registration sheet leave them out. No sideboard: official Pokémon play has none.
 - Match log: one entry per match. `Change.result` stays countable text ("1-0 vs X", `matchResult`); `Change.match` holds opponent, turn and event (column `changes.match`, migration 0007). `matchStats` groups by opponent (case-insensitive), turn order, and version; a version starts at each change to the counted list (tech options and printings do not start one).
 - Print pages: `/decks/:id/print/proxies` (missing cards, 63 × 88 mm) and `/decks/:id/print/sheet` (deck registration; player name, ID, birth date and division saved in pref `player-info`). Browser print only, no PDF library.
-- Player pages `/u/:handle` work signed out: `readSocial()` reads with the anon key (RLS shows public rows only). Followers and Follow need sign-in. The changes→decks embed must name `changes_deck_id_fkey` (two foreign keys link the tables).
+- Player pages `/u/:handle` work signed out: `readSocial()` reads with the anon key (RLS shows public rows only). Follow needs sign-in; follower counts come from the `follower_count` SQL function (migration 0008), because follows are private and counting rows from a third player's view saw only their own follow. The changes→decks embed must name `changes_deck_id_fkey` (two foreign keys link the tables).
 - Deck rename: tap the deck name (inline input; Enter saves, Esc cancels). The More menu's Rename opens the same input.
 
 ## Open work

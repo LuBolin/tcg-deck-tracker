@@ -69,7 +69,7 @@ Design doc: "TCG Deck Tracker — Design Document" (Claude Docs, https://claude.
 ## Deploy and live data
 
 - Live site: https://lubolin.github.io/tcg-deck-tracker/ (GitHub Pages, `.github/workflows/deploy.yml`). Push to `main` = live. The user expects a deploy after changes. Push over ssh; `gh` is logged in.
-- Supabase project `tdsetnriauohyanfzuzt` (URL and publishable key in `.env`). Migrations 0001-0006 are applied.
+- Supabase project `tdsetnriauohyanfzuzt` (URL and publishable key in `.env`). Migrations 0001-0005 are applied; 0006 (deck icon column) is waiting for the user to run it or sign in to the dashboard. Until then, setting a deck icon fails for signed-in players; everything else works.
 - Run each new `supabase/migrations/000N` file in the Supabase SQL editor BEFORE pushing app code that uses it. Method that worked: push the commit to a temp branch; in the dashboard SQL editor (browser pane) run `window.monaco.editor.getModels()[0].setValue(await (await fetch('https://raw.githubusercontent.com/LuBolin/tcg-deck-tracker/<sha>/supabase/migrations/<file>')).text())`, click Run, confirm the "destructive operations" warning (deletes inside `import_all`); push `main`; delete the temp branch.
 - The user's account holds real decks ("crustle 1/2", "Sample: Dragapult ex"). Never use Delete all; clean up only your own test data.
 - Never create accounts or enter secrets for the user (Google client secret, a second test account). Ask the user.

@@ -88,7 +88,7 @@ export class Social {
   async recentChanges(ownerId: string, limit = 10): Promise<{ id: string; deckId: string; deckName: string; seq: number; createdAt: string; note: string; result: string }[]> {
     const rows = await must<{ id: string; deck_id: string; seq: number; created_at: string; note: string; result: string; decks: { name: string } | { name: string }[] }[]>(
       this.db.from('changes').select('id, deck_id, seq, created_at, note, result, decks!changes_deck_id_fkey!inner(name, owner_id, is_public)')
-        .eq('decks.owner_id', ownerId).eq('decks.is_public', true).order('created_at', { ascending: false }).limit(limit),
+        .eq('decks.owner_id', ownerId).eq('decks.is_public', true).order('created_at', { ascending: false }).order('seq', { ascending: false }).limit(limit),
     );
     return rows.map((r) => ({
       id: r.id, deckId: r.deck_id, deckName: (Array.isArray(r.decks) ? r.decks[0]?.name : r.decks?.name) ?? '', seq: r.seq, createdAt: r.created_at, note: r.note, result: r.result,

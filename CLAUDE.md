@@ -73,6 +73,7 @@ Design doc: "TCG Deck Tracker — Design Document" (Claude Docs, https://claude.
 - Run each new `supabase/migrations/000N` file in the Supabase SQL editor BEFORE pushing app code that uses it. Method that worked: push the commit to a temp branch; in the dashboard SQL editor (browser pane) run `window.monaco.editor.getModels()[0].setValue(await (await fetch('https://raw.githubusercontent.com/LuBolin/tcg-deck-tracker/<sha>/supabase/migrations/<file>')).text())`, click Run, confirm the "destructive operations" warning (deletes inside `import_all`); push `main`; delete the temp branch.
 - The user's account holds real decks ("crustle 1/2", "Sample: Dragapult ex"). Never use Delete all; clean up only your own test data.
 - Never create accounts or enter secrets for the user (Google client secret, a second test account). Ask the user.
+- Test players on the live database (user approved 2026-11-15): `test_misty`, `test_brock`, `test_erika`, created by `supabase/test-players.sql` (ids `7e570000-…`). They cannot sign in. Misty owns one private deck that must never show publicly. The file's first statement alone removes them; re-run the file to reset them.
 - Supabase's built-in email sender is rate-limited; set up custom SMTP before inviting other players.
 
 ## Working with the user
@@ -98,6 +99,7 @@ Design doc: "TCG Deck Tracker — Design Document" (Claude Docs, https://claude.
 ## Open work
 
 - Google sign-in: app side done. Blocked on the user creating a Google Cloud OAuth client (Web app, redirect URI `https://tdsetnriauohyanfzuzt.supabase.co/auth/v1/callback`) and pasting ID and secret in Supabase > Auth > Providers > Google. They have step-by-step instructions and said "do other stuff first". Check: `curl https://tdsetnriauohyanfzuzt.supabase.co/auth/v1/settings -H "apikey: <publishable key>"` shows `"google":true`.
+- Checked live with the test players (2026-11-15): signed-out `/u/:handle` pages, recent changes, public decks with history and tech options, private deck hidden.
 - Not tested live: profile, follow and public-deck writes (`saveProfile`, `follow`, `isPublic`; need a second account the user must create); Settings backup download / restore from file; "Copy this browser's data to my account" with real local data. Read paths were checked live; SQL and RLS are covered by `npm run test:sql`.
 - Offered, user said no for now: scanning cards with the camera.
 - Offered, user has not decided: lazy-load supabase-js (bundle ~145 -> 206 KB gz); per-print basic Energy counts; per-deck owned-print counts (a deck can show a printing, but owned print labels are collection-wide); dedupe effect-search results (one card repeats per printing); email/push notifications (only the Activity badge exists).

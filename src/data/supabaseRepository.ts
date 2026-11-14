@@ -88,9 +88,7 @@ export class SupabaseRepository implements Repository {
   async putDeck(d: Deck) {
     await must(this.db.from('decks').upsert({
       id: d.id, game: d.game, name: d.name, format: d.format ?? null, purpose: d.purpose ?? null, labels: d.labels ?? [], locked: d.locked ?? false, is_public: d.isPublic ?? false,
-      parent_deck_id: d.parentDeckId ?? null, parent_change_id: d.parentChangeId ?? null, origin_change_id: d.originChangeId ?? null, created_at: d.createdAt, updated_at: d.updatedAt,
-      // Sent only when set, so saving works before migration 0006 adds the column.
-      ...(d.coverCardId ? { cover_card_id: d.coverCardId } : {}),
+      parent_deck_id: d.parentDeckId ?? null, parent_change_id: d.parentChangeId ?? null, origin_change_id: d.originChangeId ?? null, cover_card_id: d.coverCardId ?? null, created_at: d.createdAt, updated_at: d.updatedAt,
     }));
   }
   /** The decks_copies_to_binder trigger moves the deck's copies to the binder in the same statement. */

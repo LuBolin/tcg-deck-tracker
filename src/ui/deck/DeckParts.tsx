@@ -2,6 +2,7 @@ import { useState } from 'react';
 import * as actions from '../../app/actions';
 import { repo } from '../../app/repo';
 import { diffLists } from '../../domain/decklist';
+import type { Outcome } from '../../domain/matches';
 import type { DeckLine } from '../../domain/types';
 import { LabelChip } from '../components';
 
@@ -76,16 +77,44 @@ export function Labels({ value = [], known, onSave }: { value?: string[]; known:
   );
 }
 
-export function LogResult({ onSave, onCancel }: { onSave: (result: string, note: string) => void; onCancel: () => void }) {
-  const [result, setResult] = useState('');
+export interface LoggedMatch { outcome: Outcome; opponent: string; turn?: 'first' | 'second'; event: string; note: string }
+
+/** One match: won, lost or tied, against which deck, going first or second, at which event. */
+export function LogResult({ known, onSave, onCancel }: { known: { opponents: string[]; events: string[] }; onSave: (m: LoggedMatch) => void; onCancel: () => void }) {
+  const [outcome, setOutcome] = useState<Outcome>();
+  const [opponent, setOpponent] = useState('');
+  const [turn, setTurn] = useState<'first' | 'second'>();
+  const [event, setEvent] = useState(known.events[0] ?? '');
   const [note, setNote] = useState('');
+  const toggle = <T,>(value: T, current: T | undefined, set: (v: T | undefined) => void, label: string) => (
+    <button key={label} type="button" aria-pressed={current === value} className={current === value ? 'primary' : ''} onClick={() => set(current === value ? undefined : value)}>{label}</button>
+  );
   return (
-    <form className="panel row" onSubmit={(e) => { e.preventDefault(); if (result.trim()) onSave(result, note); }}>
-      <label className="field" style={{ minWidth: '9rem' }}>Result<input value={result} onChange={(e) => setResult(e.target.value)} placeholder="3-1 vs Gardevoir" autoFocus /></label>
-      <label className="field" style={{ flex: 1, minWidth: '12rem' }}>Note (optional)<input value={note} onChange={(e) => setNote(e.target.value)} placeholder="What worked, what did not" /></label>
-      <button type="submit" className="primary" disabled={!result.trim()}>Save result</button>
-      <button type="button" onClick={onCancel}>Cancel</button>
-      <p className="muted small" style={{ width: '100%', margin: 0 }}>Write wins-losses (for example 3-1) and the record adds up per deck and per variant.</p>
+    <form className="panel stack log-result" onSubmit={(e) => { e.preventDefault(); if (outcome) onSave({ outcome, opponent, turn, event, note }); }}>
+      <div className="row" role="group" aria-label="Result">
+        {toggle<Outcome>('win', outcome, setOutcome, 'Won')}
+        {toggle<Outcome>('loss', outcome, setOutcome, 'Lost')}
+        {toggle<Outcome>('tie', outcome, setOutcome, 'Tied')}
+        <span className="muted small">went</span>
+        {toggle<'first' | 'second'>('first', turn, setTurn, 'First')}
+        {toggle<'first' | 'second'>('second', turn, setTurn, 'Second')}
+      </div>
+      <div className="row">
+        <label className="field" style={{ flex: 1, minWidth: '10rem' }}>Opponent's deck
+          <input value={opponent} onChange={(e) => setOpponent(e.target.value)} list="known-opponents" placeholder="Gardevoir ex" />
+        </label>
+        <label className="field" style={{ flex: 1, minWidth: '10rem' }}>Event (optional)
+          <input value={event} onChange={(e) => setEvent(e.target.value)} list="known-events" placeholder="Friday locals" />
+        </label>
+      </div>
+      <datalist id="known-opponents">{known.opponents.map((o) => <option key={o} value={o} />)}</datalist>
+      <datalist id="known-events">{known.events.map((o) => <option key={o} value={o} />)}</datalist>
+      <label className="field">Note (optional)<input value={note} onChange={(e) => setNote(e.target.value)} placeholder="What worked, what did not" /></label>
+      <div className="row">
+        <button type="submit" className="primary" disabled={!outcome}>Save result</button>
+        <button type="button" onClick={onCancel}>Cancel</button>
+        <span className="muted small">One entry per match. Win rates by opponent and by version show on the Stats tab.</span>
+      </div>
     </form>
   );
 }

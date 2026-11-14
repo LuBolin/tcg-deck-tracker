@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { importShared } from '../app/actions';
-import { currentSocial, repo } from '../app/repo';
+import { readSocial, repo } from '../app/repo';
 import { unlimitedFor } from '../app/supply';
 import { useLoad } from '../app/useLoad';
 import { countCards, diffLists } from '../domain/decklist';
@@ -20,8 +20,8 @@ const SHARED = '__shared__';
 /** The deck from a share link (in the URL), or a public deck by id. */
 async function readShared(handle?: string, deckId?: string): Promise<{ decoded: SharedDeck; owner?: string }> {
   if (deckId) {
-    const social = currentSocial();
-    if (!social) throw new Error('Sign in to see public decks.');
+    const social = readSocial();
+    if (!social) throw new Error('This app has no online account service, so it cannot show public decks.');
     const found = await social.publicDeck(deckId);
     if (!found) throw new Error('This deck is private or no longer exists.');
     const { deck, changes } = found;

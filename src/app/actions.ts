@@ -1,7 +1,7 @@
 import { emptyDeckDeltas, moveDeltas } from '../domain/collection';
 import { applyDiff, normalizeLines } from '../domain/decklist';
 import { slotStatuses, summarize } from '../domain/status';
-import { BINDER, type CopyDelta, type Deck, type DeckLine, type Location } from '../domain/types';
+import { BINDER, type CopyDelta, type Deck, type DeckLine, type Location, type MatchInfo } from '../domain/types';
 import type { SharedDeck } from '../domain/share';
 import { pendingParentChanges, type PendingParentChange } from '../domain/variants';
 import type { Repository } from '../data/repository';
@@ -20,6 +20,7 @@ export interface ChangeInfo {
   result?: string;
   /** The parent change this one copies (applied parent changes). */
   sourceChangeId?: string;
+  match?: MatchInfo;
 }
 
 export async function latestLines(repo: Repository, deckId: string): Promise<DeckLine[]> {
@@ -74,6 +75,7 @@ export async function saveChange(
     note: info.note?.trim() ?? '',
     result: info.result?.trim() ?? '',
     ...(info.sourceChangeId ? { sourceChangeId: info.sourceChangeId } : {}),
+    ...(info.match ? { match: info.match } : {}),
   });
   await updateDeck(repo, deck.id, { ...opts.patch, updatedAt: t });
 }
@@ -164,6 +166,13 @@ export async function setLineQty(repo: Repository, deck: Deck, line: DeckLine, q
   const changes = await repo.listChanges(deck.id);
   const lines = (changes.at(-1)?.lines ?? []).map((l) => (l.cardId === line.cardId && l.section === line.section ? { ...l, qty } : l));
   await saveChange(repo, deck, lines.filter((l) => l.qty > 0), { tags: ['removed'], note: qty ? `Needs ${qty} ${line.name} now` : `Removed ${line.name}` }, { baseSeq: changes.at(-1)?.seq ?? 0 });
+}
+
+/** Move a card to another section, for example into or out of the tech options. */
+export async function moveToSection(repo: Repository, deck: Deck, line: DeckLine, section: { id: string; label: string }): Promise<void> {
+  const changes = await repo.listChanges(deck.id);
+  const lines = (changes.at(-1)?.lines ?? []).map((l) => (l.cardId === line.cardId && l.section === line.section ? { ...l, section: section.id } : l));
+  await saveChange(repo, deck, lines, { note: `Moved ${line.qty} ${line.name} to ${section.label}` }, { baseSeq: changes.at(-1)?.seq ?? 0 });
 }
 
 /** Show and export another printing of a card in this deck. Copies count the same whatever the printing. */

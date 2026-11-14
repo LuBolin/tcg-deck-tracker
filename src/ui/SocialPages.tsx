@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { getPref, setPref } from '../app/prefs';
 import { ACTIVITY_SEEN } from '../app/activity';
-import { currentSocial } from '../app/repo';
+import { currentSocial, readSocial } from '../app/repo';
 import { useLoad } from '../app/useLoad';
 import type { FeedItem, Profile } from '../data/social';
 import { games } from '../games';
@@ -105,26 +105,31 @@ function FindPlayers() {
 export function ProfilePage() {
   const { handle = '' } = useParams();
   const social = currentSocial();
+  const reader = readSocial();
   const { data, error, reload } = useLoad(async () => {
-    if (!social) return undefined;
-    const p = await social.profile(handle);
+    if (!reader) return undefined;
+    const p = await reader.profile(handle);
     if (!p) return null;
-    const [decks, followers, following] = await Promise.all([social.publicDecks(p.id), social.followerCount(p.id), social.following()]);
-    return { p, decks, followers, isFollowing: following.some((f) => f.id === p.id) };
+    // Followers are visible to signed-in players only.
+    const [decks, recent, followers, following] = await Promise.all([
+      reader.publicDecks(p.id), reader.recentChanges(p.id), social ? social.followerCount(p.id) : undefined, social ? social.following() : [],
+    ]);
+    return { p, decks, recent, followers, isFollowing: following.some((f) => f.id === p.id) };
   }, [handle]);
   useTitle(data ? who(data.p) : `@${handle}`);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string>();
 
-  if (!social) return <Empty>Sign in to see players' public decks and follow them. <Link to="/settings">Sign in</Link></Empty>;
+  if (!reader) return <Empty>This app has no online account service, so it cannot show players.</Empty>;
   if (error) return <Empty><ErrorBox error={error} /></Empty>;
   if (data === undefined) return <Loading />;
   if (data === null) return <Empty>No player is called @{handle}. <Link to="/activity">Find players</Link></Empty>;
-  const { p, decks, followers, isFollowing } = data;
-  const mine = p.id === social.userId;
+  const { p, decks, recent, followers, isFollowing } = data;
+  const mine = p.id === social?.userId;
   const toggle = async () => {
     setBusy(true);
     setActionError(undefined);
+    if (!social) return;
     try {
       await (isFollowing ? social.unfollow(p.id) : social.follow(p.id));
       reload();
@@ -139,9 +144,10 @@ export function ProfilePage() {
       <div className="spread">
         <div>
           <h1 style={{ marginBottom: 0 }}>{who(p)}</h1>
-          <p className="muted" style={{ marginTop: '0.2rem' }}>@{p.handle} · {followers} {followers === 1 ? 'follower' : 'followers'}</p>
+          <p className="muted" style={{ marginTop: '0.2rem' }}>@{p.handle}{followers !== undefined && ` · ${followers} ${followers === 1 ? 'follower' : 'followers'}`}</p>
         </div>
-        {!mine && <button type="button" className={isFollowing ? '' : 'primary'} onClick={toggle} disabled={busy} aria-pressed={isFollowing}>{isFollowing ? 'Following' : 'Follow'}</button>}
+        {!social && <Link className="btn" to="/settings">Sign in to follow</Link>}
+        {social && !mine && <button type="button" className={isFollowing ? '' : 'primary'} onClick={toggle} disabled={busy} aria-pressed={isFollowing}>{isFollowing ? 'Following' : 'Follow'}</button>}
       </div>
       <ErrorBox error={actionError} />
       <section className="panel stack">
@@ -160,6 +166,18 @@ export function ProfilePage() {
               );
             })}</ul>}
       </section>
+      {recent.length > 0 && (
+        <section className="panel stack">
+          <h2>Recent changes</h2>
+          <ul className="plain-list">{recent.map((c) => (
+            <li key={c.id}>
+              <Link to={`/u/${p.handle}/decks/${c.deckId}`}><strong>{c.deckName}</strong></Link>
+              <span className="muted small"> · change {c.seq} · {new Date(c.createdAt).toLocaleDateString()}</span>
+              {(c.note || c.result) && <div className="small">{[c.result && `Result ${c.result}`, c.note].filter(Boolean).join(' · ')}</div>}
+            </li>
+          ))}</ul>
+        </section>
+      )}
     </>
   );
 }

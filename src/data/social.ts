@@ -84,6 +84,16 @@ export class Social {
     );
     return rows.map((r) => ({ id: r.id, name: r.name, game: r.game, format: r.format ?? undefined, purpose: r.purpose ?? undefined, updatedAt: r.updated_at }));
   }
+  /** Latest changes to a player's public decks, newest first. */
+  async recentChanges(ownerId: string, limit = 10): Promise<{ id: string; deckId: string; deckName: string; seq: number; createdAt: string; note: string; result: string }[]> {
+    const rows = await must<{ id: string; deck_id: string; seq: number; created_at: string; note: string; result: string; decks: { name: string } | { name: string }[] }[]>(
+      this.db.from('changes').select('id, deck_id, seq, created_at, note, result, decks!changes_deck_id_fkey!inner(name, owner_id, is_public)')
+        .eq('decks.owner_id', ownerId).eq('decks.is_public', true).order('created_at', { ascending: false }).limit(limit),
+    );
+    return rows.map((r) => ({
+      id: r.id, deckId: r.deck_id, deckName: (Array.isArray(r.decks) ? r.decks[0]?.name : r.decks?.name) ?? '', seq: r.seq, createdAt: r.created_at, note: r.note, result: r.result,
+    }));
+  }
   /** A public deck (or one of mine) with its whole history, oldest change first. */
   async publicDeck(deckId: string): Promise<{ deck: { id: string; name: string; game: string; format?: string; purpose?: string; ownerId: string }; changes: Change[] } | undefined> {
     const d = await must<{ id: string; name: string; game: string; format: string | null; purpose: string | null; owner_id: string } | null>(

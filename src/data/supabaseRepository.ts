@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { Card, Change, CopyDelta, CopyRow, Deck, DeckLine, GameId, PrintRow } from '../domain/types';
+import type { Card, Change, CopyDelta, CopyRow, Deck, DeckLine, GameId, MatchInfo, PrintRow } from '../domain/types';
 import type { Backup, Prefs, Repository } from './repository';
 
 /** Rows as Postgres stores them (supabase/migrations/0001_init.sql). */
@@ -7,7 +7,7 @@ interface DeckRow {
   id: string; game: string; name: string; format: string | null; purpose: string | null; labels: string[] | null; locked: boolean | null; is_public: boolean | null;
   parent_deck_id: string | null; parent_change_id: string | null; origin_change_id: string | null; cover_card_id: string | null; created_at: string; updated_at: string;
 }
-interface ChangeRow { id: string; deck_id: string; seq: number; created_at: string; lines: DeckLine[]; tags: string[]; note: string; result: string; source_change_id?: string | null }
+interface ChangeRow { id: string; deck_id: string; seq: number; created_at: string; lines: DeckLine[]; tags: string[]; note: string; result: string; source_change_id?: string | null; match?: MatchInfo | null }
 interface CopyDbRow { game: string; card_id: string; location: string; qty: number }
 interface PrintDbRow { game: string; card_id: string; print_id: string; qty: number; rarity: string | null; set_code: string | null; number: string | null; image_url: string | null }
 const toPrint = (r: PrintDbRow): PrintRow => ({
@@ -30,6 +30,7 @@ const toDeck = (r: DeckRow): Deck => ({
 const toChange = (r: ChangeRow): Change => ({
   id: r.id, deckId: r.deck_id, seq: r.seq, createdAt: r.created_at, lines: r.lines, tags: r.tags, note: r.note, result: r.result,
   ...(r.source_change_id ? { sourceChangeId: r.source_change_id } : {}),
+  ...(r.match ? { match: r.match } : {}),
 });
 const toCard = (r: CardRow): Card => ({
   game: r.game, id: r.id, name: r.name, category: opt(r.category), subtype: opt(r.subtype), set: opt(r.set_code),
@@ -103,7 +104,7 @@ export class SupabaseRepository implements Repository {
   async addChange(c: Change) {
     const { error } = await this.db.from('changes').insert({
       id: c.id, deck_id: c.deckId, seq: c.seq, created_at: c.createdAt, lines: c.lines, tags: c.tags, note: c.note, result: c.result,
-      source_change_id: c.sourceChangeId ?? null,
+      source_change_id: c.sourceChangeId ?? null, match: c.match ?? null,
     });
     if (error?.code === '23505') throw new Error(`Change ${c.seq} already exists for this deck`);
     if (error) throw new Error(error.message);

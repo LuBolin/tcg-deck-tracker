@@ -30,6 +30,9 @@ import { downloadText } from '../download';
 import { CompareWith, Labels, LogResult, MakeVariant } from './DeckParts';
 import { deckGuide } from './deckGuide';
 import { VersionGraph } from './VersionGraph';
+import { MatchStats } from './MatchStats';
+import { matchResult } from '../../domain/matches';
+import { BINDER, OPTIONS } from '../../domain/types';
 import { deckFamily } from '../../domain/variants';
 
 async function load(id: string) {
@@ -225,6 +228,19 @@ function DeckView({ id }: { id: string }) {
   };
 
   const touch = (patch: Partial<typeof deck>) => actions.updateDeck(repo, deck.id, patch);
+  // Names used before in this deck family, newest first, so results group under one spelling.
+  const familyMatches = [...familyChanges.values()].flat().filter((c) => c.match).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  const knownMatches = {
+    opponents: [...new Set(familyMatches.map((c) => c.match!.opponent).filter((o): o is string => !!o))],
+    events: [...new Set(familyMatches.map((c) => c.match!.event).filter((o): o is string => !!o))],
+  };
+  /** Where the player's copies of a card are, for the card search. */
+  const ownedText = (cardId: string) => {
+    const rows = copies.filter((c) => c.cardId === cardId && c.qty > 0);
+    if (!rows.length) return 'none owned';
+    const where = (loc: string) => (loc === deck.id ? 'in this deck' : loc === BINDER ? 'in binder' : `in ${deckName(loc)}`);
+    return rows.map((r) => `${r.qty} ${where(r.location)}`).join(' · ');
+  };
   /** Open the editor, remembering which change the edit starts from. */
   const startEdit = (initial: DeckLine[]) => {
     setDraftBase(changes.at(-1)?.seq ?? 0);
@@ -303,6 +319,8 @@ All ${inDeckTotal} copies in it go back to your binder. The list and history sta
             { label: 'Rename', onClick: () => setNaming(true) },
             { label: 'Duplicate (independent copy)', onClick: () => run(async () => { const c = await actions.duplicateDeck(repo, deck, `${deck.name} copy`); toast(`Made ${c.name}`); navigate(`/decks/${c.id}`); }) },
             { label: 'Update from a list', disabled: !!draft, onClick: () => { setTab('cards'); setUpdating(true); setUpdateBase(changes.at(-1)?.seq ?? 0); } },
+            { label: 'Print proxies for missing cards', onClick: () => navigate(`/decks/${deck.id}/print/proxies`) },
+            { label: 'Deck registration sheet', onClick: () => navigate(`/decks/${deck.id}/print/sheet`) },
             deck.locked
               ? { label: 'Put back in rotation', onClick: () => run(() => touch({ locked: undefined }), 'Back in rotation') }
               : { label: 'Lock (keep its cards here)', onClick: () => run(() => touch({ locked: true }), 'Locked: its cards stay out of other decks') },
@@ -428,7 +446,7 @@ All ${inDeckTotal} copies in it go back to your binder. The list and history sta
         </Empty>
       )}
       {tab === 'cards' && (lines.length > 0 || draft) && (draft ? (
-        <EditList adapter={adapter} format={format} cards={cards} lines={lines} usedTags={[...new Set(changes.flatMap((c) => c.tags))].filter((t) => !['restore', 'result', 'from parent'].includes(t))} draft={draft} setDraft={setDraft}
+        <EditList adapter={adapter} format={format} cards={cards} lines={lines} owned={ownedText} usedTags={[...new Set(changes.flatMap((c) => c.tags))].filter((t) => !['restore', 'result', 'from parent'].includes(t))} draft={draft} setDraft={setDraft}
           onSave={(info) => run(async () => { await actions.saveChange(repo, deck, draft, info, { baseSeq: draftBase }); setDraft(null); }, 'Change saved')} />
       ) : (
         <>
@@ -453,8 +471,12 @@ All ${inDeckTotal} copies in it go back to your binder. The list and history sta
           <FilterChips label="Type" options={types} value={type} onChange={setType} />
           <FilterChips label="Roles" options={roles} value={role} onChange={setRole} extra={<Link className="small" to="/settings#roles">Rename</Link>} />
           {logging && (
-            <LogResult onCancel={() => setLogging(false)}
-              onSave={(result, note) => run(async () => { await actions.saveChange(repo, deck, lines, { tags: ['result'], result, note }, { baseSeq: changes.at(-1)?.seq ?? 0 }); setLogging(false); }, 'Result logged')} />
+            <LogResult known={knownMatches} onCancel={() => setLogging(false)}
+              onSave={(m) => run(async () => {
+                const match = { ...(m.opponent.trim() ? { opponent: m.opponent.trim() } : {}), ...(m.turn ? { turn: m.turn } : {}), ...(m.event.trim() ? { event: m.event.trim() } : {}) };
+                await actions.saveChange(repo, deck, lines, { tags: ['result'], result: matchResult(m.outcome, m.opponent), note: m.note, match }, { baseSeq: changes.at(-1)?.seq ?? 0 });
+                setLogging(false);
+              }, 'Result logged')} />
           )}
           {shownLines.length === 0 && filtering && <p className="muted small">{queried || role || type ? 'No cards in this deck match.' : cardFilter === 'missing' ? 'Nothing missing: you own every card in this deck.' : 'Every owned copy is already in this deck.'}</p>}
           {(shownLines.length > 0 || !filtering) && <CardList adapter={adapter} lines={shownLines} statuses={statuses} cards={cards} illegal={illegal} format={format} view={view} deckName={deckName} isLocked={isLocked}
@@ -473,6 +495,10 @@ All ${inDeckTotal} copies in it go back to your binder. The list and history sta
                 if (qty === 0) setDetail(undefined); else setDetail({ ...detail, qty });
               }, 'List updated')}
               onMove={(from, qty) => moveInto(detail.cardId, detail.name, from, qty)}
+              onMoveSection={(s) => run(async () => {
+                await actions.moveToSection(repo, deck, detail, s);
+                setDetail(undefined);
+              }, `Moved to ${s.label}`)}
               onPrinting={(p) => run(async () => {
                 await actions.setPrinting(repo, deck, detail, p);
                 setDetail({ ...detail, set: p.set, number: p.number, imageUrl: p.imageUrl });
@@ -490,7 +516,7 @@ All ${inDeckTotal} copies in it go back to your binder. The list and history sta
         </>
       ))}
 
-      {tab === 'stats' && <DeckStats adapter={adapter} lines={lines} cards={cards} statuses={statuses} />}
+      {tab === 'stats' && <><MatchStats changes={changes} /><DeckStats adapter={adapter} lines={lines.filter((l) => l.section !== OPTIONS)} cards={cards} statuses={statuses} /></>}
 
       {tab === 'history' && (
         <div className="panel">
@@ -515,7 +541,7 @@ All ${inDeckTotal} copies in it go back to your binder. The list and history sta
                   {c.tags.map((t) => <span key={t} className="chip accent">{t}</span>)}
                 </div>
                 {c.note && <p style={{ margin: '0.25rem 0' }}>{c.note}</p>}
-                {c.result && <p className="small" style={{ margin: '0.25rem 0' }}>Result: <strong>{c.result}</strong></p>}
+                {c.result && <p className="small" style={{ margin: '0.25rem 0' }}>Result: <strong>{c.result}</strong>{c.match?.turn && <span className="muted"> · went {c.match.turn}</span>}{c.match?.event && <span className="muted"> · {c.match.event}</span>}</p>}
                 {prev ? <DiffView diff={diffLists(prev.lines, c.lines)} /> : <span className="muted small">{countCards(c.lines)} cards</span>}
                 {c.seq !== changes.at(-1)?.seq && (
                   <div style={{ marginTop: '0.3rem' }}>

@@ -1,4 +1,4 @@
-import type { Card, DeckLine } from './types';
+import { OPTIONS, type Card, type DeckLine } from './types';
 
 /** Construction rules for one format. Games supply these through their adapter. */
 export interface DeckRules {
@@ -51,6 +51,7 @@ export function validateDeck(lines: DeckLine[], rules: DeckRules, cards?: Map<st
   }
   const byName = new Map<string, { name: string; qty: number; limit?: number }>();
   for (const l of lines) {
+    if (l.section === OPTIONS) continue; // considered, not played
     const key = rules.copyKey === 'card' ? l.cardId : l.name.toLowerCase();
     const e = byName.get(key) ?? { name: l.name, qty: 0 };
     e.qty += l.qty;

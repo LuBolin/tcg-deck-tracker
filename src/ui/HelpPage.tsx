@@ -24,7 +24,8 @@ export function HelpPage() {
           <h2>Changes and variants</h2>
           <p>Every save is a <strong>change</strong> with what changed and why (tags, a note, a match result). Old versions stay in History.</p>
           <p>A <strong>variant</strong> is a copy of a deck for another situation (another meta, a budget). It shares your physical cards and remembers its parent: when the parent changes, the variant can apply the change too, oldest first.</p>
-          <p className="small muted">Write results as wins-losses (for example 3-1) and each deck keeps a record.</p>
+          <p><strong>Log a result</strong> after each match: won, lost or tied, the opponent's deck, and whether you went first. The Stats tab shows win rates by opponent, by turn order and by the version of the deck you played.</p>
+          <p><strong>Tech options</strong> are cards you are considering. Open a card and choose <strong>Move to Tech options</strong>: it stays listed with the deck but needs no copies and does not count toward the 60.</p>
         </section>
         <section className="panel stack">
           <h2>Version graph</h2>
@@ -37,7 +38,7 @@ export function HelpPage() {
         </section>
         <section className="panel stack">
           <h2>Following players</h2>
-          <p>Signed in, pick a handle in Settings. Make a deck public from its <strong>More</strong> menu; players who follow you see its changes on their <Link to="/activity">Activity</Link> page, with a badge for anything new.</p>
+          <p>Signed in, pick a handle in Settings. Your page is <strong>/u/your-handle</strong>: anyone with the link sees your public decks and their recent changes, signed in or not. Make a deck public from its <strong>More</strong> menu; players who follow you see its changes on their <Link to="/activity">Activity</Link> page, with a badge for anything new.</p>
         </section>
         <section className="panel stack">
           <h2>Want-lists and selling</h2>
@@ -47,6 +48,10 @@ export function HelpPage() {
         <section className="panel stack">
           <h2>Sharing a deck</h2>
           <p>A deck's <strong>Share</strong> link carries the list and every reason inside the link itself; nothing is uploaded. Whoever opens it sees the deck checked against their own cards and can save a copy.</p>
+        </section>
+        <section className="panel stack">
+          <h2>Printing</h2>
+          <p>From a deck's <strong>More</strong> menu: <strong>Print proxies for missing cards</strong> (card-size images for playtesting) and a <strong>Deck registration sheet</strong> for tournaments, filled from the list.</p>
         </section>
         <section className="panel stack">
           <h2>Importing</h2>

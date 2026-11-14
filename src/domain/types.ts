@@ -40,6 +40,19 @@ export interface Card {
   fetchedAt?: string;
 }
 
+/**
+ * Section for tech options: cards a player is considering. They show with the deck but are not part of it:
+ * no copies are needed, they are never missing, and they do not count toward size or copy limits.
+ */
+export const OPTIONS = 'options';
+
+/** Details of one logged match (the record itself is in `Change.result`). */
+export interface MatchInfo {
+  opponent?: string;
+  turn?: 'first' | 'second';
+  event?: string;
+}
+
 /** One line of a deck list. */
 export interface DeckLine {
   cardId: string;
@@ -94,6 +107,8 @@ export interface Change {
   result: string;
   /** For a change taken from the parent deck: that parent change. */
   sourceChangeId?: string;
+  /** For a logged match: opponent deck, turn order, event. */
+  match?: MatchInfo;
 }
 
 /** Count of physical copies of one card at one location. */

@@ -1,5 +1,5 @@
 import { splitTrailingSetNumber, type ListFormat, type ParsedLine } from '../../domain/listParse';
-import type { Card, DeckLine } from '../../domain/types';
+import { OPTIONS, type Card, type DeckLine } from '../../domain/types';
 import { fetchJson, pool } from '../common';
 import type { GameAdapter, Printing, RaritySymbol, ResolvedLine } from '../types';
 
@@ -252,7 +252,7 @@ export function createPokemonAdapter(fetchFn: typeof fetchJson = fetchJson): Gam
     ],
     name: 'Pokémon',
     source: { name: 'TCGdex', url: 'https://tcgdex.dev', prices: 'TCGplayer market price via TCGdex' },
-    sections: [{ id: 'main', label: 'Deck' }],
+    sections: [{ id: 'main', label: 'Deck' }, { id: OPTIONS, label: 'Tech options' }],
     categories: ['Pokémon', 'Trainer', 'Energy'],
     formats: ['Standard', 'Expanded', 'Unlimited'],
     openingHand: 7,
@@ -262,7 +262,8 @@ export function createPokemonAdapter(fetchFn: typeof fetchJson = fetchJson): Gam
     listFormat: format,
 
     formatLine: (l) => [String(l.qty), l.name, l.set, l.number].filter(Boolean).join(' '),
-    formatList(lines: DeckLine[]) {
+    formatList(all: DeckLine[]) {
+      const lines = all.filter((l) => l.section !== OPTIONS); // TCG Live and Limitless lists hold the 60 cards only
       const groups = ['Pokémon', 'Trainer', 'Energy'].map((cat) => lines.filter((l) => (l.category ?? 'Trainer') === cat));
       return groups
         .map((g, i) => (g.length ? [`${['Pokémon', 'Trainer', 'Energy'][i]}: ${g.reduce((n, l) => n + l.qty, 0)}`, ...g.map((l) => this.formatLine(l))].join('\n') : ''))

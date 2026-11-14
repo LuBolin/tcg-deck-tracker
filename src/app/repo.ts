@@ -32,6 +32,10 @@ export async function enabledProviders(): Promise<string[]> {
 /** Following and public decks; undefined until signed in. */
 export const currentSocial = () => social;
 
+let reader: Social | undefined;
+/** Reading public profiles and decks, signed in or not (row-level security shows signed-out visitors only public rows). */
+export const readSocial = () => social ?? (supabase ? (reader ??= new Social(supabase, '')) : undefined);
+
 /** The signed-in account, or undefined when data is stored in this browser. */
 export const currentAccount = () => account;
 

@@ -69,7 +69,7 @@ Design doc: "TCG Deck Tracker — Design Document" (Claude Docs, https://claude.
 ## Deploy and live data
 
 - Live site: https://lubolin.github.io/tcg-deck-tracker/ (GitHub Pages, `.github/workflows/deploy.yml`). Push to `main` = live. The user expects a deploy after changes. Push over ssh; `gh` is logged in.
-- Supabase project `tdsetnriauohyanfzuzt` (URL and publishable key in `.env`). Migrations 0001-0006 are applied (0006 on 2026-11-14).
+- Supabase project `tdsetnriauohyanfzuzt` (URL and publishable key in `.env`). Migrations 0001-0007 are applied (0006 and 0007 on 2026-11-14).
 - Run each new `supabase/migrations/000N` file in the Supabase SQL editor BEFORE pushing app code that uses it. Method that worked: push the commit to a temp branch; in the dashboard SQL editor (browser pane) run `window.monaco.editor.getModels()[0].setValue(await (await fetch('https://raw.githubusercontent.com/LuBolin/tcg-deck-tracker/<sha>/supabase/migrations/<file>')).text())`, click Run, confirm the "destructive operations" warning (deletes inside `import_all`); push `main`; delete the temp branch.
 - The user's account holds real decks ("crustle 1/2", "Sample: Dragapult ex"). Never use Delete all; clean up only your own test data.
 - Never create accounts or enter secrets for the user (Google client secret, a second test account). Ask the user.
@@ -89,12 +89,17 @@ Design doc: "TCG Deck Tracker — Design Document" (Claude Docs, https://claude.
 - "Use the most common printing" on import is off by default.
 - Printing in a deck (card dialog): a line's `set`/`number`/`imageUrl` pick the shown and exported printing, saved as a new change (`actions.setPrinting`). Display only; ownership and prices ignore it.
 - Deck icon: `Deck.coverCardId` (column `cover_card_id`, migration 0006), set from the card dialog; falls back to the priciest card when unset or no longer in the list.
+- Tech options (`OPTIONS` section, Pokémon "Tech options"): ideas shown with the deck. `cardTotals` and copy limits skip them, so they need no copies, are never missing and never gathered; exports (`formatList`) and the registration sheet leave them out. No sideboard: official Pokémon play has none.
+- Match log: one entry per match. `Change.result` stays countable text ("1-0 vs X", `matchResult`); `Change.match` holds opponent, turn and event (column `changes.match`, migration 0007). `matchStats` groups by opponent (case-insensitive), turn order, and version; a version starts at each change to the counted list (tech options and printings do not start one).
+- Print pages: `/decks/:id/print/proxies` (missing cards, 63 × 88 mm) and `/decks/:id/print/sheet` (deck registration; player name, ID, birth date and division saved in pref `player-info`). Browser print only, no PDF library.
+- Player pages `/u/:handle` work signed out: `readSocial()` reads with the anon key (RLS shows public rows only). Followers and Follow need sign-in. The changes→decks embed must name `changes_deck_id_fkey` (two foreign keys link the tables).
 - Deck rename: tap the deck name (inline input; Enter saves, Esc cancels). The More menu's Rename opens the same input.
 
 ## Open work
 
 - Google sign-in: app side done. Blocked on the user creating a Google Cloud OAuth client (Web app, redirect URI `https://tdsetnriauohyanfzuzt.supabase.co/auth/v1/callback`) and pasting ID and secret in Supabase > Auth > Providers > Google. They have step-by-step instructions and said "do other stuff first". Check: `curl https://tdsetnriauohyanfzuzt.supabase.co/auth/v1/settings -H "apikey: <publishable key>"` shows `"google":true`.
 - Not tested live: profile, follow and public-deck writes (`saveProfile`, `follow`, `isPublic`; need a second account the user must create); Settings backup download / restore from file; "Copy this browser's data to my account" with real local data. Read paths were checked live; SQL and RLS are covered by `npm run test:sql`.
+- Offered, user said no for now: scanning cards with the camera.
 - Offered, user has not decided: lazy-load supabase-js (bundle ~145 -> 206 KB gz); per-print basic Energy counts; per-deck owned-print counts (a deck can show a printing, but owned print labels are collection-wide); dedupe effect-search results (one card repeats per printing); email/push notifications (only the Activity badge exists).
 - Commits use the user's git identity. Their GitHub no-reply address was offered instead; no answer yet.
 

@@ -9,7 +9,7 @@ import { DiffView, ErrorBox, FilterChips, TagPicker } from '../components';
 import { cardTypes, typeOptions } from '../../domain/cardText';
 import { groupLines } from './group';
 
-export function EditList({ adapter, format, cards, lines, draft, setDraft, onSave, usedTags = [] }: {
+export function EditList({ adapter, format, cards, lines, draft, setDraft, onSave, owned, usedTags = [] }: {
   adapter: GameAdapter;
   /** Tags used before in this deck's history, offered again. */
   usedTags?: string[];
@@ -19,6 +19,8 @@ export function EditList({ adapter, format, cards, lines, draft, setDraft, onSav
   draft: DeckLine[];
   setDraft: (d: DeckLine[] | null) => void;
   onSave: (info: ChangeInfo) => void;
+  /** Where the player's copies of a card are, shown under each search result. */
+  owned?: (cardId: string) => string;
 }) {
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState('');
@@ -78,7 +80,7 @@ export function EditList({ adapter, format, cards, lines, draft, setDraft, onSav
         {issues.length > 0 && (
           <ul className="issues small">{issues.map((i) => <li key={describeIssue(i)}>{describeIssue(i)}</li>)}</ul>
         )}
-        <AddCard adapter={adapter} onAdd={add} />
+        <AddCard adapter={adapter} onAdd={add} owned={owned} />
       </div>
       <div className="panel stack save-panel">
         <h3>Save this change</h3>
@@ -113,7 +115,7 @@ export function EditList({ adapter, format, cards, lines, draft, setDraft, onSav
   );
 }
 
-function AddCard({ adapter, onAdd }: { adapter: GameAdapter; onAdd: (card: Card, section: string) => void }) {
+function AddCard({ adapter, onAdd, owned }: { adapter: GameAdapter; onAdd: (card: Card, section: string) => void; owned?: (cardId: string) => string }) {
   const [q, setQ] = useState('');
   const [section, setSection] = useState(adapter.sections.find((s) => s.id === 'main')?.id ?? adapter.sections[0].id);
   const [results, setResults] = useState<Card[]>();
@@ -159,6 +161,7 @@ function AddCard({ adapter, onAdd }: { adapter: GameAdapter; onAdd: (card: Card,
                 {c.name}
                 <br />
                 <span className="muted small">{[c.category, c.subtype, c.limitGroup, c.set, c.number].filter(Boolean).join(' · ')}{c.price !== undefined ? ` · ${formatUsd(c.price)}` : ''}</span>
+                {owned && <><br /><span className="small owned-note">{owned(c.id)}</span></>}
               </span>
             </button>
           ))}

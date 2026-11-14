@@ -4,6 +4,7 @@ import { createBrowserRouter, RouterProvider } from 'react-router';
 import { initRepo } from './app/repo';
 import { CollectionPage } from './ui/CollectionPage';
 import { DeckPage } from './ui/deck/DeckPage';
+import { PrintPage } from './ui/deck/PrintPage';
 import { ToastProvider } from './ui/toast';
 import { DecksPage } from './ui/DecksPage';
 import { ImportPage } from './ui/ImportPage';
@@ -25,6 +26,7 @@ const router = createBrowserRouter([
       { path: '/', element: <DecksPage /> },
       { path: '/import', element: <ImportPage /> },
       { path: '/decks/:id', element: <DeckPage /> },
+      { path: '/decks/:id/print/:kind', element: <PrintPage /> },
       { path: '/collection', element: <CollectionPage /> },
       { path: '/want', element: <WantPage /> },
       { path: '/settings', element: <SettingsPage /> },

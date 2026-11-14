@@ -1,4 +1,4 @@
-import type { DeckLine } from './types';
+import { OPTIONS, type DeckLine } from './types';
 
 export interface LineDiff {
   cardId: string;
@@ -67,10 +67,10 @@ export function applyDiff(lines: DeckLine[], diff: LineDiff[], source: DeckLine[
   return [...result.values()].filter((l) => l.qty > 0);
 }
 
-/** Physical copies a list needs per card, across all sections. */
+/** Physical copies a list needs per card, across all sections except tech options. */
 export function cardTotals(lines: DeckLine[]): Map<string, number> {
   const totals = new Map<string, number>();
-  for (const l of lines) totals.set(l.cardId, (totals.get(l.cardId) ?? 0) + l.qty);
+  for (const l of lines) if (l.section !== OPTIONS) totals.set(l.cardId, (totals.get(l.cardId) ?? 0) + l.qty);
   return totals;
 }
 

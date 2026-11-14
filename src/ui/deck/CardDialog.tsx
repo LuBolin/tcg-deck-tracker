@@ -6,7 +6,7 @@ import { repo } from '../../app/repo';
 import { useLoad } from '../../app/useLoad';
 import { formatUsd } from '../../domain/insights';
 import type { SlotStatus } from '../../domain/status';
-import { BINDER, type Card, type DeckLine } from '../../domain/types';
+import { BINDER, OPTIONS, type Card, type DeckLine } from '../../domain/types';
 import type { GameAdapter, Printing } from '../../games/types';
 import { RarityMark } from '../CollectionGrid';
 import { LabelChip, SlotChips } from '../components';
@@ -28,6 +28,8 @@ interface Props {
   onTakeOut: (qty: number, updateList: boolean) => void;
   /** Make this line need `qty` copies (the copies in the deck now). */
   onTrim: (qty: number) => void;
+  /** Move the card to another section (into or out of the tech options). */
+  onMoveSection: (section: { id: string; label: string }) => void;
   /** Show and export this printing in the deck. */
   onPrinting: (printing: Printing) => void;
   /** This card's art is the deck icon. */
@@ -37,7 +39,7 @@ interface Props {
 }
 
 /** Card details and quick actions, in a native modal dialog (focus trap and Esc for free). */
-export function CardDialog({ adapter, deckId, line, card, status, deckName, isLocked, onMove, onAcquired, onTakeOut, onTrim, onPrinting, isCover, onCover, onClose }: Props) {
+export function CardDialog({ adapter, deckId, line, card, status, deckName, isLocked, onMove, onAcquired, onTakeOut, onTrim, onMoveSection, onPrinting, isCover, onCover, onClose }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const [got, setGot] = useState(status?.missing || 1);
   const inDeck = status?.inDeck ?? 0;
@@ -112,11 +114,20 @@ export function CardDialog({ adapter, deckId, line, card, status, deckName, isLo
           {card?.text && <p className="card-text small">{card.text}</p>}
           {adapter.id === 'pokemon' && <p className="muted small" style={{ margin: 0 }}>Legality shown is for this printing; a legal reprint with the same text also counts.</p>}
 
-          <div>
+          {adapter.sections.length > 1 && (
+            <div className="row">
+              {adapter.sections.filter((s) => s.id !== line.section).map((s) => (
+                <button key={s.id} type="button" className="small" onClick={() => onMoveSection(s)}>Move to {s.label}</button>
+              ))}
+            </div>
+          )}
+          {line.section === OPTIONS ? (
+            <p className="small" style={{ margin: 0 }}>A tech option ({line.qty}): shown with the deck but not part of it. No copies are needed for it.</p>
+          ) : <div>
             <h3>This deck needs {line.qty}{status && status.needed !== line.qty ? ` (${status.needed} across sections)` : ''}
               {status && inDeck < status.needed && <span className="short"> ({inDeck}/{status.needed} in deck)</span>}</h3>
             <div className="row"><SlotChips status={status} deckName={deckName} isLocked={isLocked} /></div>
-          </div>
+          </div>}
 
           {inDeck > 0 && !status?.unlimited && (
             <div className="stack takeout" style={{ gap: '0.4rem' }}>

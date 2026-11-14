@@ -100,7 +100,8 @@ Design doc: "TCG Deck Tracker — Design Document" (Claude Docs, https://claude.
 
 - Google sign-in: app side done. Blocked on the user creating a Google Cloud OAuth client (Web app, redirect URI `https://tdsetnriauohyanfzuzt.supabase.co/auth/v1/callback`) and pasting ID and secret in Supabase > Auth > Providers > Google. They have step-by-step instructions and said "do other stuff first". Check: `curl https://tdsetnriauohyanfzuzt.supabase.co/auth/v1/settings -H "apikey: <publishable key>"` shows `"google":true`.
 - Checked live with the test players (2026-11-15): signed-out `/u/:handle` pages, recent changes, public decks with history and tech options, private deck hidden.
-- Not tested live: profile, follow and public-deck writes (`saveProfile`, `follow`, `isPublic`; need a second account the user must create); Settings backup download / restore from file; "Copy this browser's data to my account" with real local data. Read paths were checked live; SQL and RLS are covered by `npm run test:sql`.
+- Checked live in the app, signed in as the user (2026-11-15): Follow and unfollow on a player page, follower count, Activity feed, and the Activity badge (a new change shows 1; opening Activity clears it).
+- Not tested live: `saveProfile` and making a deck public from the app; Settings backup download / restore from file; "Copy this browser's data to my account" with real local data. Read paths were checked live; SQL and RLS are covered by `npm run test:sql`.
 - Offered, user said no for now: scanning cards with the camera.
 - Offered, user has not decided: lazy-load supabase-js (bundle ~145 -> 206 KB gz); per-print basic Energy counts; per-deck owned-print counts (a deck can show a printing, but owned print labels are collection-wide); dedupe effect-search results (one card repeats per printing); email/push notifications (only the Activity badge exists).
 - Commits use the user's git identity. Their GitHub no-reply address was offered instead; no answer yet.
@@ -110,4 +111,6 @@ Design doc: "TCG Deck Tracker — Design Document" (Claude Docs, https://claude.
 - The browser pane is often tiny: `resize_window` 1000x800, click by ref, verify with DOM/JS rather than screenshots.
 - Stopping `npm run dev` with TaskStop leaves vite on port 5173. Stop it by port (PowerShell `Get-NetTCPConnection -LocalPort 5173`).
 - Python heredocs in Bash break on quotes. Write edit scripts to the scratchpad and run them.
+- Acting as another player without anyone signing in: in the Supabase SQL editor run a `do $$ … $$` block that does `set local role authenticated; perform set_config('request.jwt.claims', '{"sub":"<user id>","role":"authenticated"}', true);`, then the reads and writes to check, and ends with `raise exception 'CHECK …', values`. Row-level security applies as that player, the exception rolls everything back, and its message carries the results. Use the test players' ids.
+- The user's app session lives in the browser pane (the tab their email link opened). Do not sign out or clear site data there; the Supabase dashboard tab must also stay open and signed in. Do not set passwords, mint login links or turn on anonymous sign-ins to get around a sign-in.
 - TCGdex can search Trainer/Energy rule text (`effect=like:`) but not attack or ability text.

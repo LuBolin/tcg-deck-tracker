@@ -74,7 +74,7 @@ export function DecksPage() {
   useTitle("Decks");
   const [query, setQuery] = useState('');
   const [nudge, setNudge] = useState(true);
-  const [bucket, setBucket] = useState<Bucket>('rotation');
+  const [picked, setBucket] = useState<Bucket>();
   const [label, setLabel] = useState<string>();
   const [sort, setSort] = useState<Sort>(() => {
     try { return (localStorage.getItem(SORT_KEY) as Sort) || 'name'; } catch { return 'name'; }
@@ -91,6 +91,8 @@ export function DecksPage() {
     : a.deck.name.localeCompare(b.deck.name);
   const bucketOf = (d: Deck): Bucket => (data.info.get(d.id)!.held === 0 ? 'empty' : d.locked ? 'locked' : 'rotation');
   const counts = Object.fromEntries(BUCKETS.map((b) => [b.id, data.decks.filter((d) => bucketOf(d) === b.id).length])) as Record<Bucket, number>;
+  // Until the player picks a tab, open the first one with decks (a just-imported deck holds no copies, so it is "empty").
+  const bucket = picked ?? BUCKETS.find((b) => counts[b.id] > 0)?.id ?? 'rotation';
   const allLabels = [...new Set(data.decks.flatMap((d) => d.labels ?? []))].sort();
   const matches = (d: Deck) =>
     bucketOf(d) === bucket && (!q || d.name.toLowerCase().includes(q)) && (!label || (d.labels ?? []).includes(label));

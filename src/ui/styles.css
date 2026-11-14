@@ -404,3 +404,11 @@ button.label-chip.on { background: hsl(var(--label-hue) 65% 45%); color: #fff; }
 .google-btn:hover { background: #f8f9fa; }
 .or-line { display: flex; align-items: center; gap: 0.5rem; max-width: 26rem; }
 .or-line::before, .or-line::after { content: ''; flex: 1; border-top: 1px solid var(--border); }
+
+/* Touch screens: fingers need bigger targets than a mouse pointer. */
+@media (pointer: coarse) {
+  button, .btn, select { min-height: 40px; }
+  button.small, .btn.small, .inline-select, button.chip, button.label-chip, .link-button { min-height: 36px; }
+  .title-button { min-height: 0; }
+  summary { padding-block: 0.5rem; }
+}

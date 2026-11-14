@@ -70,7 +70,7 @@ function CardRow({ line: l, open, onToggle, statuses, cards, illegal, format, de
         <button type="button" className="link-button" onClick={() => onOpen(l)}>{l.name}</button>
         <Short st={st} />
         <span className="print">{[l.set, l.number].filter(Boolean).join(' ')}</span>
-        {card?.imageUrl && <img className="preview" src={card.imageUrl} alt="" loading="lazy" />}
+        {(l.imageUrl ?? card?.imageUrl) && <img className="preview" src={l.imageUrl ?? card!.imageUrl} alt="" loading="lazy" />}
       </span>
       <span className="chips">
         {illegal.has(l.cardId) && <span className="chip bad" title={`Not legal in ${format}`}>not {format}-legal</span>}
@@ -99,7 +99,7 @@ function CardTile({ line: l, statuses, cards, illegal, format, deckName, isLocke
   return (
     <figure className={`card-tile ${missing === st?.needed && missing > 0 ? 'all-missing' : ''}`}>
       <button type="button" className="art" onClick={() => onOpen(l)} aria-label={`${l.name} details`}>
-        {card?.imageUrl ? <img src={card.imageUrl} alt={l.name} loading="lazy" /> : <div className="no-art">{l.name}</div>}
+        {(l.imageUrl ?? card?.imageUrl) ? <img src={l.imageUrl ?? card!.imageUrl} alt={l.name} loading="lazy" /> : <div className="no-art">{l.name}</div>}
         <span className="qty-badge">{l.qty}×</span>
         {missing > 0 && <span className="missing-badge">{missing} missing</span>}
       </button>

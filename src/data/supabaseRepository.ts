@@ -5,7 +5,7 @@ import type { Backup, Prefs, Repository } from './repository';
 /** Rows as Postgres stores them (supabase/migrations/0001_init.sql). */
 interface DeckRow {
   id: string; game: string; name: string; format: string | null; purpose: string | null; labels: string[] | null; locked: boolean | null; is_public: boolean | null;
-  parent_deck_id: string | null; parent_change_id: string | null; origin_change_id: string | null; created_at: string; updated_at: string;
+  parent_deck_id: string | null; parent_change_id: string | null; origin_change_id: string | null; cover_card_id: string | null; created_at: string; updated_at: string;
 }
 interface ChangeRow { id: string; deck_id: string; seq: number; created_at: string; lines: DeckLine[]; tags: string[]; note: string; result: string; source_change_id?: string | null }
 interface CopyDbRow { game: string; card_id: string; location: string; qty: number }
@@ -25,7 +25,7 @@ const num = (v: number | string | null) => (v === null ? undefined : Number(v));
 const toDeck = (r: DeckRow): Deck => ({
   id: r.id, game: r.game, name: r.name, format: opt(r.format), purpose: opt(r.purpose),
   labels: r.labels?.length ? r.labels : undefined, locked: r.locked || undefined, isPublic: r.is_public || undefined,
-  parentDeckId: opt(r.parent_deck_id), parentChangeId: opt(r.parent_change_id), originChangeId: opt(r.origin_change_id), createdAt: r.created_at, updatedAt: r.updated_at,
+  parentDeckId: opt(r.parent_deck_id), parentChangeId: opt(r.parent_change_id), originChangeId: opt(r.origin_change_id), coverCardId: opt(r.cover_card_id), createdAt: r.created_at, updatedAt: r.updated_at,
 });
 const toChange = (r: ChangeRow): Change => ({
   id: r.id, deckId: r.deck_id, seq: r.seq, createdAt: r.created_at, lines: r.lines, tags: r.tags, note: r.note, result: r.result,
@@ -88,7 +88,7 @@ export class SupabaseRepository implements Repository {
   async putDeck(d: Deck) {
     await must(this.db.from('decks').upsert({
       id: d.id, game: d.game, name: d.name, format: d.format ?? null, purpose: d.purpose ?? null, labels: d.labels ?? [], locked: d.locked ?? false, is_public: d.isPublic ?? false,
-      parent_deck_id: d.parentDeckId ?? null, parent_change_id: d.parentChangeId ?? null, origin_change_id: d.originChangeId ?? null, created_at: d.createdAt, updated_at: d.updatedAt,
+      parent_deck_id: d.parentDeckId ?? null, parent_change_id: d.parentChangeId ?? null, origin_change_id: d.originChangeId ?? null, cover_card_id: d.coverCardId ?? null, created_at: d.createdAt, updated_at: d.updatedAt,
     }));
   }
   /** The decks_copies_to_binder trigger moves the deck's copies to the binder in the same statement. */

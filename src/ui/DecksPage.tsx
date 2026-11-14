@@ -48,7 +48,7 @@ async function load() {
         summary: summarize(d.id, lines, copies, unlimitedFor(g)),
         mainCount: countCards(lines, 'main'),
         value: deckValue(lines, cards, slotStatuses(d.id, lines, copies, undefined, unlimitedFor(g))).total,
-        cover: coverArt(lines, cards),
+        cover: coverArt(lines, cards, d.coverCardId),
         lastNote: notes.get(d.id),
         record: records.get(d.id)!,
         issues: getGameOrNull(g) ? validateDeck(lines, getGameOrNull(g)!.deckRules(d.format), cards).length : 0,

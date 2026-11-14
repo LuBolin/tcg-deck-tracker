@@ -81,8 +81,11 @@ export function totalRecord(results: string[]): MatchRecord {
 
 export const formatRecord = (r: MatchRecord) => `${r.wins}-${r.losses}${r.draws ? `-${r.draws}` : ''}`;
 
-/** The priciest non-basic card with art: usually the card the deck is built around. */
-export function coverArt(lines: DeckLine[], cards: Map<string, Card>): string | undefined {
+/** The chosen card's art, else the priciest non-basic card with art: usually the card the deck is built around. */
+export function coverArt(lines: DeckLine[], cards: Map<string, Card>, coverCardId?: string): string | undefined {
+  const chosen = coverCardId ? lines.find((l) => l.cardId === coverCardId) : undefined;
+  const chosenArt = chosen && (chosen.imageUrl ?? cards.get(chosen.cardId)?.imageUrl);
+  if (chosenArt) return chosenArt;
   return lines
     .map((l) => cards.get(l.cardId))
     .filter((c): c is Card => !!c?.imageUrl && c.category !== 'Energy' && c.category !== 'Land')

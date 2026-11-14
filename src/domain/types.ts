@@ -51,6 +51,8 @@ export interface DeckLine {
   set?: string;
   number?: string;
   category?: string;
+  /** Art of the printing chosen in this deck (set and number above); the card's default art when unset. */
+  imageUrl?: string;
 }
 
 export interface Deck {
@@ -72,6 +74,8 @@ export interface Deck {
   isPublic?: boolean;
   /** The parent's change this variant was made from. Never moves, so the version graph can show where it started. */
   originChangeId?: string;
+  /** Card whose art is the deck icon; the priciest card when unset or no longer in the list. */
+  coverCardId?: string;
   createdAt: string;
   updatedAt: string;
 }

@@ -5,7 +5,8 @@ import { summarizeDiff } from '../domain/decklist';
 import { summarize } from '../domain/status';
 import { BINDER, type DeckLine } from '../domain/types';
 import { pendingParentChanges } from '../domain/variants';
-import { applyParentChange, createDeck, deleteDeck, duplicateDeck, gatherFrom, latestLines, movedCount, revertDeltas, makeVariant, moveCopies, pullFromBinder, saveChange } from './actions';
+import { applyParentChange, createDeck, deleteDeck, duplicateDeck, gatherFrom, latestLines, movedCount, revertDeltas, makeVariant, moveCopies, pullFromBinder, saveChange, setPrinting } from './actions';
+import { coverArt } from '../domain/insights';
 
 const line = (cardId: string, qty: number): DeckLine => ({ cardId, name: cardId, qty, section: 'main' });
 
@@ -182,5 +183,28 @@ describe('prefs', () => {
     await repo.setPrefs({ 'role-names': { draw: 'card draw' } });
     await repo.importAll({ version: 1, decks: [], changes: [], copies: [], cards: [] });
     expect(await new LocalRepository('test-prefs').getPrefs()).toEqual({ 'role-names': { draw: 'card draw' } });
+  });
+});
+
+describe('deck printing and icon', () => {
+  it('changes only the printing of one card, as a new change', async () => {
+    const repo = new LocalRepository('test-printing');
+    const deck = await createDeck(repo, { game: 'demo', name: 'P', lines: [line('a', 4), line('b', 2)] });
+    await setPrinting(repo, deck, line('a', 4), { set: 'NEW', number: '7', rarity: 'Rare', imageUrl: 'art-a' });
+    const changes = await repo.listChanges(deck.id);
+    expect(changes).toHaveLength(2);
+    expect(changes[1].note).toBe('a: printing NEW 7 (Rare)');
+    const a = changes[1].lines.find((l) => l.cardId === 'a')!;
+    expect([a.qty, a.set, a.number, a.imageUrl]).toEqual([4, 'NEW', '7', 'art-a']);
+    expect(changes[1].lines.find((l) => l.cardId === 'b')).toEqual(changes[0].lines.find((l) => l.cardId === 'b'));
+  });
+
+  it('uses the chosen card as the icon while it is in the list', () => {
+    const cards = new Map([['a', { game: 'demo', id: 'a', name: 'a', imageUrl: 'cheap', price: 1 }], ['b', { game: 'demo', id: 'b', name: 'b', imageUrl: 'pricey', price: 9 }]]);
+    const lines = [line('a', 1), line('b', 1)];
+    expect(coverArt(lines, cards)).toBe('pricey');
+    expect(coverArt(lines, cards, 'a')).toBe('cheap');
+    expect(coverArt([{ ...line('a', 1), imageUrl: 'alt' }, line('b', 1)], cards, 'a')).toBe('alt');
+    expect(coverArt(lines, cards, 'gone')).toBe('pricey');
   });
 });

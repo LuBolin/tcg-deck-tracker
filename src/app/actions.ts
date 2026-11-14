@@ -166,6 +166,14 @@ export async function setLineQty(repo: Repository, deck: Deck, line: DeckLine, q
   await saveChange(repo, deck, lines.filter((l) => l.qty > 0), { tags: ['removed'], note: qty ? `Needs ${qty} ${line.name} now` : `Removed ${line.name}` }, { baseSeq: changes.at(-1)?.seq ?? 0 });
 }
 
+/** Show and export another printing of a card in this deck. Copies count the same whatever the printing. */
+export async function setPrinting(repo: Repository, deck: Deck, line: DeckLine, p: { set?: string; number?: string; rarity?: string; imageUrl?: string }): Promise<void> {
+  const changes = await repo.listChanges(deck.id);
+  const lines = (changes.at(-1)?.lines ?? []).map((l) => (l.cardId === line.cardId ? { ...l, set: p.set, number: p.number, imageUrl: p.imageUrl } : l));
+  const label = [p.set, p.number].filter(Boolean).join(' ');
+  await saveChange(repo, deck, lines, { note: `${line.name}: printing ${label}${p.rarity ? ` (${p.rarity})` : ''}` }, { baseSeq: changes.at(-1)?.seq ?? 0 });
+}
+
 /** Send every copy in the deck back to the binder. The list and history stay, so the deck shows under Empty decks. */
 export async function archiveDeck(repo: Repository, deck: Deck): Promise<CopyDelta[]> {
   const deltas = emptyDeckDeltas(await repo.listCopies(deck.game), deck.id);

@@ -71,6 +71,7 @@ function DeckView({ id }: { id: string }) {
   const toast = useToast();
   const { data, error, reload } = useLoad(() => load(id), [id]);
   const [tab, setTab] = useState<Tab>('cards');
+  const [naming, setNaming] = useState(false);
   const [draft, setDraft] = useState<DeckLine[] | null>(null);
   const [draftBase, setDraftBase] = useState(0);
   const [showExport, setShowExport] = useState(false);
@@ -180,7 +181,7 @@ function DeckView({ id }: { id: string }) {
   });
   const filtering = cardFilter !== 'all' || !!queried || !!role || !!type;
   const historyTags = [...new Set(changes.flatMap((c) => c.tags))].sort();
-  const cover = coverArt(lines, cards);
+  const cover = coverArt(lines, cards, deck.coverCardId);
   const summary = summarize(deck.id, lines, copies, unlimitedFor(deck.game));
   const value = deckValue(lines, cards, statuses);
   const deckName = (did: string) => decks.find((d) => d.id === did)?.name ?? 'another deck';
@@ -230,8 +231,9 @@ function DeckView({ id }: { id: string }) {
     setDraft(initial);
   };
 
-  const rename = () => {
-    const name = window.prompt('Deck name', deck.name)?.trim();
+  const saveName = (input: HTMLInputElement) => {
+    setNaming(false);
+    const name = input.value.trim();
     if (name && name !== deck.name) run(() => touch({ name }), 'Deck renamed');
   };
 
@@ -274,7 +276,13 @@ All ${inDeckTotal} copies in it go back to your binder. The list and history sta
           </div>
           <div className="deck-title">
             {cover && <img className="deck-title-art" src={cover} alt="" />}
-            <h1>{deck.name}</h1>
+            {naming
+              ? <input className="title-input" autoFocus defaultValue={deck.name} aria-label="Deck name" onBlur={(e) => saveName(e.currentTarget)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') e.currentTarget.blur();
+                    if (e.key === 'Escape') { e.currentTarget.value = deck.name; e.currentTarget.blur(); }
+                  }} />
+              : <h1><button type="button" className="title-button" onClick={() => setNaming(true)} title="Rename">{deck.name}</button></h1>}
             {deck.locked && <span className="chip" title="Its cards are not offered for gathering into other decks">Locked</span>}
             {deck.isPublic && <span className="chip accent" title="Anyone signed in can view it; your followers see its changes">Public</span>}
           </div>
@@ -292,7 +300,7 @@ All ${inDeckTotal} copies in it go back to your binder. The list and history sta
           <button type="button" onClick={() => setSharing((v) => !v)} aria-expanded={sharing}>Share</button>
           <Link className="btn" to={`/want?deck=${deck.id}`}>Want-list</Link>
           <MoreMenu items={[
-            { label: 'Rename', onClick: rename },
+            { label: 'Rename', onClick: () => setNaming(true) },
             { label: 'Duplicate (independent copy)', onClick: () => run(async () => { const c = await actions.duplicateDeck(repo, deck, `${deck.name} copy`); toast(`Made ${c.name}`); navigate(`/decks/${c.id}`); }) },
             { label: 'Update from a list', disabled: !!draft, onClick: () => { setTab('cards'); setUpdating(true); setUpdateBase(changes.at(-1)?.seq ?? 0); } },
             deck.locked
@@ -465,6 +473,12 @@ All ${inDeckTotal} copies in it go back to your binder. The list and history sta
                 if (qty === 0) setDetail(undefined); else setDetail({ ...detail, qty });
               }, 'List updated')}
               onMove={(from, qty) => moveInto(detail.cardId, detail.name, from, qty)}
+              onPrinting={(p) => run(async () => {
+                await actions.setPrinting(repo, deck, detail, p);
+                setDetail({ ...detail, set: p.set, number: p.number, imageUrl: p.imageUrl });
+              }, 'Printing changed')}
+              isCover={cover !== undefined && cover === (detail.imageUrl ?? cards.get(detail.cardId)?.imageUrl)}
+              onCover={() => run(() => touch({ coverCardId: detail.cardId }), 'Deck icon changed')}
               onAcquired={(qty) => {
                 const deltas = [{ cardId: detail.cardId, location: deck.id, delta: qty }];
                 run(async () => {

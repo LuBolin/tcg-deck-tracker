@@ -7,7 +7,8 @@ import { useLoad } from '../../app/useLoad';
 import { formatUsd } from '../../domain/insights';
 import type { SlotStatus } from '../../domain/status';
 import { BINDER, type Card, type DeckLine } from '../../domain/types';
-import type { GameAdapter } from '../../games/types';
+import type { GameAdapter, Printing } from '../../games/types';
+import { RarityMark } from '../CollectionGrid';
 import { LabelChip, SlotChips } from '../components';
 import { cardTags } from '../../domain/cardText';
 
@@ -27,11 +28,16 @@ interface Props {
   onTakeOut: (qty: number, updateList: boolean) => void;
   /** Make this line need `qty` copies (the copies in the deck now). */
   onTrim: (qty: number) => void;
+  /** Show and export this printing in the deck. */
+  onPrinting: (printing: Printing) => void;
+  /** This card's art is the deck icon. */
+  isCover: boolean;
+  onCover: () => void;
   onClose: () => void;
 }
 
 /** Card details and quick actions, in a native modal dialog (focus trap and Esc for free). */
-export function CardDialog({ adapter, deckId, line, card, status, deckName, isLocked, onMove, onAcquired, onTakeOut, onTrim, onClose }: Props) {
+export function CardDialog({ adapter, deckId, line, card, status, deckName, isLocked, onMove, onAcquired, onTakeOut, onTrim, onPrinting, isCover, onCover, onClose }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const [got, setGot] = useState(status?.missing || 1);
   const inDeck = status?.inDeck ?? 0;
@@ -49,6 +55,9 @@ export function CardDialog({ adapter, deckId, line, card, status, deckName, isLo
     }
     return out;
   }, [line.cardId]);
+
+  const printings = useLoad(async () => (card && adapter.printingsOf ? adapter.printingsOf(card) : []), [card?.id]);
+  const art = line.imageUrl ?? card?.imageUrl;
 
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
@@ -72,7 +81,12 @@ export function CardDialog({ adapter, deckId, line, card, status, deckName, isLo
       onCancel={(e) => { e.preventDefault(); close(); }} aria-labelledby="card-dialog-title">
       <div className="card-dialog-body">
         <div className="card-dialog-art">
-          {card?.imageUrl ? <img src={card.imageUrl.replace('/low.webp', '/high.webp').replace('/small/', '/normal/')} alt={line.name} /> : <div className="no-art">{line.name}</div>}
+          {art ? <img src={art.replace('/low.webp', '/high.webp').replace('/small/', '/normal/')} alt={line.name} /> : <div className="no-art">{line.name}</div>}
+          {art && (
+            <button type="button" className="small" onClick={onCover} disabled={isCover} style={{ marginTop: '0.5rem', width: '100%' }}>
+              {isCover ? 'This is the deck icon' : 'Use as deck icon'}
+            </button>
+          )}
         </div>
         <div className="stack">
           <div className="spread">
@@ -129,6 +143,30 @@ export function CardDialog({ adapter, deckId, line, card, status, deckName, isLo
                 {status.inOtherDecks.filter((o) => !isLocked(o.deckId)).map((o) => (
                   <button key={o.deckId} type="button" className="small" onClick={() => onMove(o.deckId, o.qty)}>From {deckName(o.deckId)} ({o.qty})</button>
                 ))}
+              </div>
+            </div>
+          )}
+
+          {(printings.data?.length ?? 0) > 1 && (
+            <div className="stack" style={{ gap: '0.4rem' }}>
+              <span className="muted small">Printing in this deck. Tap one to show and export it; your copies count the same whatever the printing.</span>
+              <div className="print-grid">
+                {printings.data!.map((p) => {
+                  const current = p.set === line.set && p.number === line.number;
+                  return (
+                    <div key={p.printId} className={`print-tile ${current ? 'owned' : ''}`}>
+                      <button type="button" className="art-button choose" onClick={() => onPrinting(p)} disabled={current} aria-pressed={current}
+                        aria-label={`Use ${[p.set, p.number, p.rarity].filter(Boolean).join(' ')}`}>
+                        {p.imageUrl ? <img src={p.imageUrl} alt="" loading="lazy" /> : <span className="no-art">{p.set} {p.number}</span>}
+                      </button>
+                      <div className="print-meta small">
+                        {p.rarity && <RarityMark adapter={adapter} rarity={p.rarity} />}
+                        <span>{[p.set, p.number].filter(Boolean).join(' ')}</span>
+                        {p.price !== undefined && <span className="muted">{formatUsd(p.price)}</span>}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

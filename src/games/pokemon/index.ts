@@ -340,9 +340,11 @@ export function createPokemonAdapter(fetchFn: typeof fetchJson = fetchJson): Gam
       if (settled.every((r) => r.status === 'rejected')) throw (settled[0] as PromiseRejectedResult).reason;
       const [byName, byText] = settled.map((r) => (r.status === 'fulfilled' ? r.value : []));
       const seen = new Set<string>();
-      const briefs = [...byName, ...byText].filter((b) => !b.image?.includes('/tcgp/') && !seen.has(b.id) && seen.add(b.id)).slice(0, 16);
+      const briefs = [...byName, ...byText].filter((b) => !b.image?.includes('/tcgp/') && !seen.has(b.id) && seen.add(b.id)).slice(0, 24);
       const cards = await pool(briefs, 8, async (b) => toCard(await getCard(b.id)).catch(() => undefined));
-      return cards.filter((c): c is Card => !!c);
+      // Printings of one card share its id; show the card once.
+      const ids = new Set<string>();
+      return cards.filter((c): c is Card => !!c && !ids.has(c.id) && !!ids.add(c.id)).slice(0, 16);
     },
   };
 }

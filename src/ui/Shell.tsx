@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { unreadActivity } from '../app/activity';
 import { Link, NavLink, Outlet, useLocation } from 'react-router';
-import { APP_NAME, currentAccount, supabase } from '../app/repo';
+import { APP_NAME, cloud, currentAccount } from '../app/repo';
 
 export function Shell() {
   const { pathname } = useLocation();
@@ -45,7 +45,7 @@ export function Shell() {
           )}
           <NavLink to="/settings">Settings</NavLink>
           <NavLink to="/help">Help</NavLink>
-          {supabase && !currentAccount() && <Link to="/settings" className="nav-cta">Sign in</Link>}
+          {cloud && !currentAccount() && <Link to="/settings" className="nav-cta">Sign in</Link>}
         </nav>
       </header>
       <main className="main">
@@ -54,7 +54,7 @@ export function Shell() {
       <footer className="footer small muted">
         {currentAccount()
           ? <>Saved to your account ({currentAccount()!.email}). <Link to="/settings">Account and backups</Link></>
-          : <>Your decks are saved in this browser only. <Link to="/settings">{supabase ? 'Sign in or back up' : 'Back up or restore'}</Link></>} · Card data from community services (see Settings). Press / to search.
+          : <>Your decks are saved in this browser only. <Link to="/settings">{cloud ? 'Sign in or back up' : 'Back up or restore'}</Link></>} · Card data from community services (see Settings). Press / to search.
       </footer>
     </>
   );

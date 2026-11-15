@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { getPref, setPref } from '../app/prefs';
 import { ACTIVITY_SEEN } from '../app/activity';
-import { currentSocial, readSocial } from '../app/repo';
+import { cloud, currentSocial, readSocial } from '../app/repo';
 import { useLoad } from '../app/useLoad';
 import type { FeedItem, Profile } from '../data/social';
 import { games } from '../games';
@@ -105,8 +105,8 @@ function FindPlayers() {
 export function ProfilePage() {
   const { handle = '' } = useParams();
   const social = currentSocial();
-  const reader = readSocial();
   const { data, error, reload } = useLoad(async () => {
+    const reader = await readSocial();
     if (!reader) return undefined;
     const p = await reader.profile(handle);
     if (!p) return null;
@@ -119,7 +119,7 @@ export function ProfilePage() {
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string>();
 
-  if (!reader) return <Empty>This app has no online account service, so it cannot show players.</Empty>;
+  if (!cloud) return <Empty>This app has no online account service, so it cannot show players.</Empty>;
   if (error) return <Empty><ErrorBox error={error} /></Empty>;
   if (data === undefined) return <Loading />;
   if (data === null) return <Empty>No player is called @{handle}. <Link to="/activity">Find players</Link></Empty>;

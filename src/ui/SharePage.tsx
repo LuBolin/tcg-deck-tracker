@@ -20,7 +20,7 @@ const SHARED = '__shared__';
 /** The deck from a share link (in the URL), or a public deck by id. */
 async function readShared(handle?: string, deckId?: string): Promise<{ decoded: SharedDeck; owner?: string }> {
   if (deckId) {
-    const social = readSocial();
+    const social = await readSocial();
     if (!social) throw new Error('This app has no online account service, so it cannot show public decks.');
     const found = await social.publicDeck(deckId);
     if (!found) throw new Error('This deck is private or no longer exists.');

@@ -435,10 +435,10 @@ describe('pokemon common printing, unlimited Energy and text search', async () =
     expect(adapter.unlimited!.test('trainer:iono')).toBe(false);
   });
 
-  it('searches names and rules text, without duplicates', async () => {
+  it('searches names and rules text, one result per card', async () => {
     const found = await adapter.search('draw');
     expect(calls.some((u) => u.startsWith(`${T}/cards?effect=like:draw`))).toBe(true);
-    expect(found.map((c) => c.number)).toEqual(['185', '269']);
+    expect(found.map((c) => c.number)).toEqual(['185']); // two printings of Iono, shown once
   });
 });
 

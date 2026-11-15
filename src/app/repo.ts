@@ -1,4 +1,4 @@
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { LocalRepository } from '../data/localRepository';
 import type { Repository } from '../data/repository';
 import { SupabaseRepository } from '../data/supabaseRepository';
@@ -9,9 +9,23 @@ export const APP_NAME = 'TCG Deck Tracker';
 
 const url = import.meta.env.VITE_SUPABASE_URL;
 const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-/** Undefined when the build has no Supabase settings: the app then runs on browser storage only. */
-export const supabase: SupabaseClient | undefined =
-  url && key ? createClient(url, key, { auth: { flowType: 'implicit' } }) : undefined; // implicit: a sign-in link works when opened on another device
+/** False when the build has no Supabase settings: the app then runs on browser storage only. */
+export const cloud = !!(url && key);
+
+let client: Promise<SupabaseClient> | undefined;
+/** The Supabase client, downloaded on first use so signed-out visitors skip it. Call only when `cloud`. */
+export const getSupabase = () =>
+  (client ??= import('@supabase/supabase-js').then(({ createClient }) =>
+    createClient(url!, key!, { auth: { flowType: 'implicit' } }))); // implicit: a sign-in link works when opened on another device
+
+const AUTH_KEY = /^sb-.+-auth-token$/;
+/** A stored session, or a sign-in link that just opened the app (tokens or an error in the hash). */
+function maybeSignedIn() {
+  try {
+    if (Object.keys(localStorage).some((k) => AUTH_KEY.test(k))) return true;
+  } catch { /* storage blocked: no stored session */ }
+  return /access_token=|error_description=/.test(location.hash);
+}
 
 /** This browser's own storage. Stays available after sign-in, to copy its data into the account. */
 export const localRepo = new LocalRepository();
@@ -34,7 +48,10 @@ export const currentSocial = () => social;
 
 let reader: Social | undefined;
 /** Reading public profiles and decks, signed in or not (row-level security shows signed-out visitors only public rows). */
-export const readSocial = () => social ?? (supabase ? (reader ??= new Social(supabase, '')) : undefined);
+export async function readSocial() {
+  if (social || !cloud) return social;
+  return (reader ??= new Social(await getSupabase(), ''));
+}
 
 /** The signed-in account, or undefined when data is stored in this browser. */
 export const currentAccount = () => account;
@@ -49,7 +66,13 @@ export async function initRepo() {
 }
 
 async function pickStorage() {
-  if (!supabase) return;
+  if (!cloud) return;
+  if (!maybeSignedIn()) {
+    // Signed out: skip the client. Signing in from another tab writes the session key; reload into the account.
+    addEventListener('storage', (e) => { if (e.key && AUTH_KEY.test(e.key) && e.newValue) location.reload(); });
+    return;
+  }
+  const supabase = await getSupabase();
   const { data } = await supabase.auth.getSession();
   const user = data.session?.user;
   if (user) {

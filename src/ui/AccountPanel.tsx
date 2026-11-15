@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { currentAccount, currentSocial, enabledProviders, localRepo, repo, supabase } from '../app/repo';
+import { cloud, currentAccount, currentSocial, enabledProviders, getSupabase, localRepo, repo } from '../app/repo';
 import { Link } from 'react-router';
 import { HANDLE } from '../data/social';
 import { ErrorBox } from './components';
@@ -15,8 +15,7 @@ export function AccountPanel() {
   // Google sign-in shows only once it is switched on in the Supabase project.
   const [google, setGoogle] = useState(false);
   useEffect(() => { if (!account) enabledProviders().then((p) => setGoogle(p.includes('google')), () => {}); }, [account]);
-  const sb = supabase;
-  if (!sb) return null;
+  if (!cloud) return null;
 
   const run = async (work: () => Promise<string | undefined>) => {
     setBusy(true);
@@ -34,14 +33,14 @@ export function AccountPanel() {
   const signInWithGoogle = () =>
     run(async () => {
       // Leaves for Google and comes back signed in; the page reloads into the account.
-      const { error } = await sb.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${location.origin}${import.meta.env.BASE_URL}` } });
+      const { error } = await (await getSupabase()).auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${location.origin}${import.meta.env.BASE_URL}` } });
       if (error) throw new Error(error.message);
       return undefined;
     });
 
   const sendLink = () =>
     run(async () => {
-      const { error } = await sb.auth.signInWithOtp({
+      const { error } = await (await getSupabase()).auth.signInWithOtp({
         email: email.trim(),
         options: { emailRedirectTo: `${location.origin}${import.meta.env.BASE_URL}` },
       });
@@ -72,7 +71,7 @@ export function AccountPanel() {
           <ProfileEditor />
           <div className="row">
             <button type="button" onClick={copyLocal} disabled={busy}>Copy this browser's data to my account…</button>
-            <button type="button" onClick={() => run(async () => { await sb.auth.signOut(); return undefined; })} disabled={busy}>Sign out</button>
+            <button type="button" onClick={() => run(async () => { await (await getSupabase()).auth.signOut(); return undefined; })} disabled={busy}>Sign out</button>
           </div>
         </>
       ) : (

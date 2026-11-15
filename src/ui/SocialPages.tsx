@@ -96,7 +96,7 @@ function FindPlayers() {
       <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Handle, for example ash_k" aria-label="Find players by handle" />
       {found && (found.length === 0
         ? <p className="muted small">No players with a handle starting with “{q.trim()}”.</p>
-        : <ul className="plain-list">{found.filter((p) => p.id !== social.userId).map((p) => <li key={p.id}><Link to={`/u/${p.handle}`}>{who(p)}</Link> <span className="muted small">@{p.handle}</span></li>)}</ul>)}
+        : <ul className="plain-list">{found.filter((p) => p.id !== social.userId).map((p) => <li key={p.id}><Link to={`/u/${p.handle}`}>{who(p)}</Link> {p.displayName && <span className="muted small">@{p.handle}</span>}</li>)}</ul>)}
     </div>
   );
 }
@@ -143,7 +143,7 @@ export function ProfilePage() {
       <div className="spread">
         <div>
           <h1 style={{ marginBottom: 0 }}>{who(p)}</h1>
-          <p className="muted" style={{ marginTop: '0.2rem' }}>@{p.handle} · {followers} {followers === 1 ? 'follower' : 'followers'}</p>
+          <p className="muted" style={{ marginTop: '0.2rem' }}>{p.displayName && `@${p.handle} · `}{followers} {followers === 1 ? 'follower' : 'followers'}</p>
         </div>
         {!social && <Link className="btn" to="/settings">Sign in to follow</Link>}
         {social && !mine && <button type="button" className={isFollowing ? '' : 'primary'} onClick={toggle} disabled={busy} aria-pressed={isFollowing}>{isFollowing ? 'Following' : 'Follow'}</button>}

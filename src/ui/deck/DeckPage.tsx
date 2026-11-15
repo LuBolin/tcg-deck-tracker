@@ -300,7 +300,7 @@ All ${inDeckTotal} copies in it go back to your binder. The list and history sta
                   }} />
               : <h1><button type="button" className="title-button" onClick={() => setNaming(true)} title="Rename">{deck.name}</button></h1>}
             {deck.locked && <span className="chip" title="Its cards are not offered for gathering into other decks">Locked</span>}
-            {deck.isPublic && <span className="chip accent" title="Anyone signed in can view it; your followers see its changes">Public</span>}
+            {deck.isPublic && <span className="chip accent" title="Anyone can view it on your player page; your followers see its changes">Public</span>}
           </div>
           <Labels value={deck.labels} known={knownLabels} onSave={(labels) => run(() => touch({ labels: labels.length ? labels : undefined }))} />
           {deck.purpose && <p className="purpose small"><span className="muted">When to play:</span> {deck.purpose}</p>}

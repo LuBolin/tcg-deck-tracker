@@ -5,7 +5,7 @@ Design doc: "TCG Deck Tracker — Design Document" (Claude Docs, https://claude.
 ## Architecture
 
 - `src/domain/` stays game-neutral and pure (no fetch, no storage, no React). Game rules live only in `src/games/<game>/`.
-- All storage goes through `Repository` (`src/data/repository.ts`). The UI never touches IndexedDB or Supabase directly. Pick the backend only in `src/app/repo.ts`: Supabase when signed in, else IndexedDB (`repo` forwards to the chosen one; sign-in or sign-out reloads the page).
+- All storage goes through `Repository` (`src/data/repository.ts`). The UI never touches IndexedDB or Supabase directly. Pick the backend only in `src/app/repo.ts`: Supabase when signed in, else IndexedDB (`repo` forwards to the chosen one; sign-in or sign-out reloads the page). supabase-js loads on demand (`getSupabase`): at start only when a stored `sb-*-auth-token` or a sign-in link hash is present, else on first use; `cloud` says whether the build has Supabase settings.
 - Multi-step operations live in `src/app/actions.ts`, not in pages.
 - The UI uses no version-control words: deck, variant, change, reason, "made from". Never branch, commit, merge or fork.
 
@@ -57,6 +57,7 @@ Design doc: "TCG Deck Tracker — Design Document" (Claude Docs, https://claude.
 - Parent changes are applied or dismissed oldest first only (`assertOldestPending`); skipping one would lose it.
 - List edits remember the change they started from (`baseSeq`); saving after the deck changed is refused, so nothing is silently undone.
 - Deck field updates go through `updateDeck` (re-reads the stored deck) so a stale page cannot undo a rename from another tab.
+- Card search shows one result per card id (printings share it), at most 16.
 - Pokémon name-only lines: fetch every printing, sort newest set first (TCGdex returns them unordered), then pick.
 - Card role tags ("draw", "removal", "gust") are computed from `Card.text` and type by `src/domain/cardText.ts` (common rules + `adapter.tagRules`), never stored, so better rules apply to cached cards. Rules match short phrases loosely (stemming, accents, typos, a word window); `not` phrases rule out look-alikes. Search uses the same matcher over name, tags and text.
 - Deck labels (`Deck.labels`) are the player's own words for when to play a deck; `Deck.locked` puts a deck away (its copies are not gathered and collapse into one chip). "Empty decks" is computed: decks holding no copies.
@@ -101,9 +102,10 @@ Design doc: "TCG Deck Tracker — Design Document" (Claude Docs, https://claude.
 - Google sign-in: app side done. Blocked on the user creating a Google Cloud OAuth client (Web app, redirect URI `https://tdsetnriauohyanfzuzt.supabase.co/auth/v1/callback`) and pasting ID and secret in Supabase > Auth > Providers > Google. They have step-by-step instructions and said "do other stuff first". Check: `curl https://tdsetnriauohyanfzuzt.supabase.co/auth/v1/settings -H "apikey: <publishable key>"` shows `"google":true`.
 - Checked live with the test players (2026-11-15): signed-out `/u/:handle` pages, recent changes, public decks with history and tech options, private deck hidden.
 - Checked live in the app, signed in as the user (2026-11-15): Follow and unfollow on a player page, follower count, Activity feed, and the Activity badge (a new change shows 1; opening Activity clears it).
-- Not tested live: `saveProfile` and making a deck public from the app; Settings backup download / restore from file; "Copy this browser's data to my account" with real local data. Read paths were checked live; SQL and RLS are covered by `npm run test:sql`.
+- Checked live, signed in as the user (2026-11-15): saving the handle (`lubolin`, the user can change it), making a deck public (signed-out REST read saw only it) and private again, `/u/lubolin` and its public deck page, Settings backup download (captured in the page, not saved).
+- Not tested live: restore from file; "Copy this browser's data to my account" with real local data. Read paths were checked live; SQL and RLS are covered by `npm run test:sql`.
 - Offered, user said no for now: scanning cards with the camera.
-- Offered, user has not decided: lazy-load supabase-js (bundle ~145 -> 206 KB gz); per-print basic Energy counts; per-deck owned-print counts (a deck can show a printing, but owned print labels are collection-wide); dedupe effect-search results (one card repeats per printing); email/push notifications (only the Activity badge exists).
+- Offered, user has not decided: per-print basic Energy counts; per-deck owned-print counts (a deck can show a printing, but owned print labels are collection-wide); email/push notifications (only the Activity badge exists).
 - Commits use the user's git identity. Their GitHub no-reply address was offered instead; no answer yet.
 
 ## Tooling gotchas
